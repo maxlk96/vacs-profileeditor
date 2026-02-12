@@ -1,5 +1,7 @@
 # VACS Profile Editor
 
+### Deployed on [https://maxlk96.github.io/vacs-profileeditor/](https://maxlk96.github.io/vacs-profileeditor/)
+
 A simple GUI to create and edit **VACS tabbed profiles** without manually editing JSON.  
 Profiles define the layout of direct-access keys for the [VATSIM ATC Communication System (vacs)](https://github.com/MorpheusXAUT/vacs) client.
 
@@ -7,6 +9,8 @@ Profiles define the layout of direct-access keys for the [VATSIM ATC Communicati
 - **Tabs**: Add, remove, reorder tabs (including **drag-and-drop**). Edit tab label and row count.
 - **Keys**: Add, remove, reorder keys (including **drag-and-drop** in the grid). Move key left/right/up/down. Edit label (up to 3 lines), station ID, and optional subpage.
 - **Client-page tabs**: Tabs that use `client_page` (dynamic client list) are shown as read-only.
+
+# Running a local deployment
 
 ## Run
 
