@@ -106,6 +106,9 @@ export default function KeyEditor({
           </button>
         </div>
       )}
+      <button type="button" onClick={() => onUpdateKey(() => ({ label: [] }))}>
+        Clear key
+      </button>
       <button type="button" onClick={onRemoveKey}>
         Remove key
       </button>
