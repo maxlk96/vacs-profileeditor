@@ -10,6 +10,11 @@ Profiles define the layout of direct-access keys for the [VATSIM ATC Communicati
 - **Keys**: Add, remove, reorder keys (including **drag-and-drop** in the grid). Move key left/right/up/down. Edit label (up to 3 lines), station ID, and optional subpage.
 - **Client-page tabs**: Tabs that use `client_page` (dynamic client list) are shown as read-only.
 
+# Contributing
+
+Forks and PRs are encouraged!
+Feel free to create issues, don't count on frequent updates of this project, it already serves its main purpose.
+
 # Running a local deployment
 
 ## Run
