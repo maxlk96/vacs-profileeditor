@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/header.tsx","./src/components/keyeditor.tsx","./src/components/keygrid.tsx","./src/components/tabbar.tsx","./src/lib/validation.ts"],"version":"5.6.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/vite-env.d.ts","./src/components/header.tsx","./src/components/keyeditor.tsx","./src/components/keygrid.tsx","./src/components/tabbar.tsx","./src/hooks/useprofilehistory.ts","./src/lib/validation.ts"],"version":"5.6.3"}

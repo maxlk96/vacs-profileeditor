@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { TabbedProfile, DirectAccessKey, DirectAccessPage } from './types'
 import { createDefaultProfile } from './types'
 import { validateProfile, normalizeProfile } from './lib/validation'
+import { useProfileHistory } from './hooks/useProfileHistory'
 import Header from './components/Header'
 import TabBar from './components/TabBar'
 import KeyGrid from './components/KeyGrid'
@@ -34,8 +35,32 @@ function getRowsAtPath(profile: TabbedProfile, tabIndex: number, path: SubpagePa
   return page?.rows ?? 4
 }
 
+export interface BreadcrumbItem {
+  label: string
+  path: SubpagePath
+}
+
+function getBreadcrumbItems(profile: TabbedProfile, tabIndex: number, path: SubpagePath): BreadcrumbItem[] {
+  const items: BreadcrumbItem[] = []
+  const tab = profile.tabs[tabIndex]
+  if (!tab) return items
+  items.push({ label: tab.label, path: [] })
+  let page = tab.page
+  for (let i = 0; i < path.length; i++) {
+    const keys = page.keys ?? []
+    const key = keys[path[i]]
+    if (!key) break
+    const line0 = (key.label ?? [])[0] ?? ''
+    const label = line0.trim() || `Key ${path[i] + 1}`
+    items.push({ label, path: path.slice(0, i + 1) })
+    if (!key.page) break
+    page = key.page
+  }
+  return items
+}
+
 export default function App() {
-  const [profile, setProfile] = useState<TabbedProfile>(createDefaultProfile)
+  const { profile, mutateProfile, replaceProfile, undo, redo } = useProfileHistory(createDefaultProfile())
   const [selectedTabIndex, setSelectedTabIndex] = useState(0)
   const [selectedKeyIndex, setSelectedKeyIndex] = useState<number | null>(null)
   const [subpagePath, setSubpagePath] = useState<SubpagePath>([])
@@ -44,25 +69,58 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const stationIdInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as Node
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
+      if (e.ctrlKey && e.key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      } else if (e.ctrlKey && e.key === 'y') {
+        e.preventDefault()
+        redo()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [undo, redo])
+
+  useEffect(() => {
+    if (profile.tabs.length > 0 && selectedTabIndex >= profile.tabs.length) {
+      setSelectedTabIndex(profile.tabs.length - 1)
+    }
+  }, [profile.tabs.length, selectedTabIndex])
+
+  useEffect(() => {
+    const keys = getKeysAtPath(profile, selectedTabIndex, subpagePath)
+    if (selectedKeyIndex != null && selectedKeyIndex >= keys.length) {
+      setSelectedKeyIndex(null)
+    }
+  }, [profile, selectedTabIndex, subpagePath, selectedKeyIndex])
+
   const currentPage = getPageAtPath(profile, selectedTabIndex, subpagePath)
   const currentKeys = getKeysAtPath(profile, selectedTabIndex, subpagePath)
   const currentRows = getRowsAtPath(profile, selectedTabIndex, subpagePath)
   const isClientPage = currentPage?.client_page != null
 
   const setProfileId = useCallback((id: string) => {
-    setProfile((p) => ({ ...p, id: id.trim() }))
-  }, [])
+    mutateProfile((p) => ({ ...p, id: id.trim() }))
+  }, [mutateProfile])
 
-  const setTabLabel = useCallback((tabIndex: number, label: string) => {
-    setProfile((p) => ({
-      ...p,
-      tabs: p.tabs.map((t, i) => (i === tabIndex ? { ...t, label: label.trim() } : t)),
-    }))
-  }, [])
+  const setTabLabel = useCallback(
+    (tabIndex: number, label: string) => {
+      mutateProfile((p) => ({
+        ...p,
+        tabs: p.tabs.map((t, i) => (i === tabIndex ? { ...t, label: label.trim() } : t)),
+      }))
+    },
+    [mutateProfile]
+  )
 
   const updateKeyAtPath = useCallback(
     (path: SubpagePath, keyIndex: number, updater: (k: DirectAccessKey) => DirectAccessKey) => {
-      setProfile((p) => {
+      mutateProfile((p) => {
         const tab = p.tabs[selectedTabIndex]
         if (!tab) return p
         const apply = (page: DirectAccessPage, pathIdx: number): DirectAccessPage => {
@@ -89,12 +147,12 @@ export default function App() {
         }
       })
     },
-    [selectedTabIndex]
+    [selectedTabIndex, mutateProfile]
   )
 
   const mutatePageAtPath = useCallback(
     (path: SubpagePath, mutate: (page: DirectAccessPage) => DirectAccessPage) => {
-      setProfile((p) => {
+      mutateProfile((p) => {
         const tab = p.tabs[selectedTabIndex]
         if (!tab) return p
         const apply = (page: DirectAccessPage, pathIdx: number): DirectAccessPage => {
@@ -115,7 +173,7 @@ export default function App() {
         }
       })
     },
-    [selectedTabIndex]
+    [selectedTabIndex, mutateProfile]
   )
 
   /** Set rows on the current page (at subpagePath). Use this for the Rows input so it affects the visible grid. */
@@ -128,33 +186,33 @@ export default function App() {
   )
 
   const addTab = useCallback(() => {
-    setProfile((p) => ({
+    mutateProfile((p) => ({
       ...p,
       tabs: [...p.tabs, { label: `Tab ${p.tabs.length + 1}`, page: { rows: 4, keys: [] } }],
     }))
     setSelectedTabIndex(profile.tabs.length)
     setSelectedKeyIndex(null)
     setSubpagePath([])
-  }, [profile.tabs.length])
+  }, [mutateProfile, profile.tabs.length])
 
   const removeTab = useCallback(() => {
     if (profile.tabs.length <= 1) return
-    setProfile((p) => ({ ...p, tabs: p.tabs.filter((_, i) => i !== selectedTabIndex) }))
+    mutateProfile((p) => ({ ...p, tabs: p.tabs.filter((_, i) => i !== selectedTabIndex) }))
     setSelectedTabIndex(Math.max(0, selectedTabIndex - 1))
     setSelectedKeyIndex(null)
     setSubpagePath([])
-  }, [profile.tabs.length, selectedTabIndex])
+  }, [mutateProfile, profile.tabs.length, selectedTabIndex])
 
   const moveTab = useCallback((from: number, to: number) => {
     if (to < 0 || to >= profile.tabs.length) return
-    setProfile((p) => {
+    mutateProfile((p) => {
       const tabs = [...p.tabs]
       const [removed] = tabs.splice(from, 1)
       tabs.splice(to, 0, removed)
       return { ...p, tabs }
     })
     setSelectedTabIndex(to)
-  }, [profile.tabs.length])
+  }, [mutateProfile, profile.tabs.length])
 
   const reorderTabs = useCallback((from: number, to: number) => {
     moveTab(from, to)
@@ -178,13 +236,17 @@ export default function App() {
   }, [mutatePageAtPath, subpagePath, selectedKeyIndex])
 
   const moveKey = useCallback(
-    (from: number, to: number) => {
-      if (to < 0 || to > currentKeys.length) return
+    (from: number, to: number, swap = false) => {
+      if (to < 0 || (swap ? to >= currentKeys.length : to > currentKeys.length)) return
       mutatePageAtPath(subpagePath, (page) => {
         const keys = page.keys ?? []
         const nextKeys = [...keys]
-        const [removed] = nextKeys.splice(from, 1)
-        nextKeys.splice(to, 0, removed)
+        if (swap) {
+          ;[nextKeys[from], nextKeys[to]] = [nextKeys[to], nextKeys[from]]
+        } else {
+          const [removed] = nextKeys.splice(from, 1)
+          nextKeys.splice(to, 0, removed)
+        }
         return { ...page, keys: nextKeys }
       })
       setSelectedKeyIndex(to)
@@ -215,7 +277,7 @@ export default function App() {
         const data = JSON.parse(text) as unknown
         const result = validateProfile(data)
         if (result.ok) {
-          setProfile(normalizeProfile(result.profile))
+          replaceProfile(normalizeProfile(result.profile))
           setSelectedTabIndex(0)
           setSelectedKeyIndex(null)
           setSubpagePath([])
@@ -229,19 +291,27 @@ export default function App() {
     reader.readAsText(file)
   }, [])
 
-  const handleSave = useCallback(() => {
-    const json = JSON.stringify(profile, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${profile.id}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }, [profile])
+  const downloadProfile = useCallback(
+    (filename: string) => {
+      const json = JSON.stringify(profile, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename.endsWith('.json') ? filename : `${filename}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    },
+    [profile]
+  )
+
+  const handleSaveAs = useCallback(() => {
+    const name = window.prompt('Filename', `${profile.id}.json`)?.trim()
+    if (name) downloadProfile(name)
+  }, [downloadProfile, profile.id])
 
   const applyNewProfile = useCallback(() => {
-    setProfile(createDefaultProfile())
+    replaceProfile(createDefaultProfile())
     setSelectedTabIndex(0)
     setSelectedKeyIndex(null)
     setSubpagePath([])
@@ -255,17 +325,17 @@ export default function App() {
 
   const handleNewProfileSaveAndNew = useCallback(() => {
     setShowNewProfileConfirm(false)
-    handleSave()
+    downloadProfile(`${profile.id}.json`)
     applyNewProfile()
-  }, [handleSave, applyNewProfile])
+  }, [downloadProfile, profile.id, applyNewProfile])
 
   const handleNewProfileDiscard = useCallback(() => {
     setShowNewProfileConfirm(false)
     applyNewProfile()
   }, [applyNewProfile])
 
-  const goBackSubpage = useCallback(() => {
-    setSubpagePath((path) => path.slice(0, -1))
+  const goBackToPath = useCallback((path: SubpagePath) => {
+    setSubpagePath(path)
     setSelectedKeyIndex(null)
   }, [])
 
@@ -274,10 +344,47 @@ export default function App() {
     setSelectedKeyIndex(null)
   }, [])
 
-  const handleDoubleClickKey = useCallback((index: number) => {
-    setSelectedKeyIndex(index)
-    setTimeout(() => stationIdInputRef.current?.focus(), 50)
-  }, [])
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as Node
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
+      if (selectedKeyIndex == null || isClientPage) return
+      if (e.key === 'Enter') {
+        const key = currentKeys[selectedKeyIndex]
+        if (key?.page != null) {
+          e.preventDefault()
+          goToSubpage(selectedKeyIndex)
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        if (selectedKeyIndex > 0) moveKey(selectedKeyIndex, selectedKeyIndex - 1)
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        if (selectedKeyIndex < currentKeys.length - 1) moveKey(selectedKeyIndex, selectedKeyIndex + 1)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (selectedKeyIndex >= currentRows) moveKey(selectedKeyIndex, selectedKeyIndex - currentRows, true)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (selectedKeyIndex + currentRows < currentKeys.length) moveKey(selectedKeyIndex, selectedKeyIndex + currentRows, true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [selectedKeyIndex, currentKeys.length, currentRows, isClientPage, moveKey, goToSubpage])
+
+  const handleDoubleClickKey = useCallback(
+    (index: number) => {
+      const key = currentKeys[index]
+      if (key?.page != null) {
+        goToSubpage(index)
+      } else {
+        setSelectedKeyIndex(index)
+        setTimeout(() => stationIdInputRef.current?.focus(), 50)
+      }
+    },
+    [currentKeys, goToSubpage]
+  )
 
   const selectedKey = selectedKeyIndex != null ? currentKeys[selectedKeyIndex] ?? null : null
 
@@ -288,7 +395,7 @@ export default function App() {
         onProfileIdChange={setProfileId}
         onNew={newProfile}
         onLoad={handleLoad}
-        onSave={handleSave}
+        onSaveAs={handleSaveAs}
         fileInputRef={fileInputRef}
         onFileChange={handleFileChange}
       />
@@ -357,8 +464,8 @@ export default function App() {
             onMoveKey={moveKey}
             onAddKey={addKey}
             onRemoveKey={removeKey}
-            subpagePath={subpagePath}
-            onBackSubpage={goBackSubpage}
+            breadcrumbItems={getBreadcrumbItems(profile, selectedTabIndex, subpagePath)}
+            onBackToPath={goBackToPath}
             isClientPage={isClientPage}
           />
         </section>
@@ -372,6 +479,15 @@ export default function App() {
           }}
           onRemoveKey={removeKey}
           onGoToSubpage={selectedKeyIndex != null ? () => goToSubpage(selectedKeyIndex) : undefined}
+          onRemoveSubpage={
+            selectedKey?.page != null
+              ? () => {
+                  if (selectedKeyIndex == null) return
+                  updateKeyAtPath(subpagePath, selectedKeyIndex, (k) => ({ ...k, page: undefined }))
+                  setSelectedKeyIndex(null)
+                }
+              : undefined
+          }
           hasSubpage={selectedKey?.page != null}
         />
       </main>

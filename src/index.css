@@ -193,6 +193,10 @@ input::placeholder, textarea::placeholder {
   font-style: italic;
 }
 
+.key-cell-no-station {
+  color: #64748b;
+}
+
 .key-actions {
   display: flex;
   flex-wrap: wrap;
@@ -232,16 +236,51 @@ input::placeholder, textarea::placeholder {
   margin-bottom: 0.5rem;
 }
 
+.breadcrumb-segment {
+  display: inline;
+}
+
+.breadcrumb-sep {
+  color: #64748b;
+  pointer-events: none;
+}
+
 .breadcrumb button {
   background: none;
   border: none;
   color: #3b82f6;
   padding: 0.2rem 0;
   text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
 }
 
 .breadcrumb button:hover {
   color: #60a5fa;
+}
+
+.breadcrumb-current {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.key-editor-subpage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.key-cell {
+  position: relative;
+}
+
+.key-cell-subpage-indicator {
+  position: absolute;
+  bottom: 0.25rem;
+  right: 0.35rem;
+  font-size: 0.65rem;
+  color: #94a3b8;
+  opacity: 0.9;
 }
 
 .client-page-badge {
@@ -301,6 +340,17 @@ input::placeholder, textarea::placeholder {
   margin: 0 0 1rem 0;
   color: #94a3b8;
   font-size: 0.95rem;
+}
+
+.modal label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.modal label input {
+  width: 100%;
 }
 
 .modal-actions {

@@ -8,6 +8,7 @@ interface KeyEditorProps {
   onUpdateKey: (updater: (k: DirectAccessKey) => DirectAccessKey) => void
   onRemoveKey: () => void
   onGoToSubpage?: () => void
+  onRemoveSubpage?: () => void
   hasSubpage: boolean
 }
 
@@ -18,6 +19,7 @@ export default function KeyEditor({
   onUpdateKey,
   onRemoveKey,
   onGoToSubpage,
+  onRemoveSubpage,
   hasSubpage,
 }: KeyEditorProps) {
   if (keyData == null || keyIndex == null) {
@@ -86,9 +88,12 @@ export default function KeyEditor({
         />
       </label>
       {hasSubpage ? (
-        <div>
+        <div className="key-editor-subpage-actions">
           <button type="button" onClick={onGoToSubpage}>
             Edit subpage
+          </button>
+          <button type="button" onClick={onRemoveSubpage}>
+            Remove subpage
           </button>
         </div>
       ) : (

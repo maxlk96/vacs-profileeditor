@@ -10,7 +10,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { DirectAccessKey } from '../types'
-import type { SubpagePath } from '../App'
+import type { BreadcrumbItem, SubpagePath } from '../App'
 
 interface KeyGridProps {
   keys: DirectAccessKey[]
@@ -19,11 +19,11 @@ interface KeyGridProps {
   onSelectKey: (index: number | null) => void
   onDoubleClickKey?: (index: number) => void
   onReorderKeys: (from: number, to: number) => void
-  onMoveKey: (from: number, to: number) => void
+  onMoveKey: (from: number, to: number, swap?: boolean) => void
   onAddKey: () => void
   onRemoveKey: () => void
-  subpagePath: SubpagePath
-  onBackSubpage: () => void
+  breadcrumbItems: BreadcrumbItem[]
+  onBackToPath: (path: SubpagePath) => void
   isClientPage?: boolean
 }
 
@@ -59,11 +59,13 @@ function SortableKeyCell({
   const line1 = (lines[1] ?? '').trim()
   const line2 = (lines[2] ?? '').trim()
   const isEmpty = lines.length === 0 || (line0 === '' && line1 === '' && line2 === '')
+  const hasNoStation = !keyData.station_id || keyData.station_id.trim() === ''
+  const hasSubpage = keyData.page != null
 
   return (
     <div
       ref={setNodeRef}
-      className={`key-cell ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isEmpty ? 'key-cell-empty' : ''}`}
+      className={`key-cell ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isEmpty ? 'key-cell-empty' : ''} ${hasNoStation ? 'key-cell-no-station' : ''} ${hasSubpage ? 'key-cell-has-subpage' : ''}`}
       style={style}
       onClick={onSelect}
       onDoubleClick={onDoubleClick}
@@ -79,6 +81,7 @@ function SortableKeyCell({
           {line2 && <span className="key-cell-line">{line2}</span>}
         </>
       )}
+      {hasSubpage && <span className="key-cell-subpage-indicator" title="Has subpage">▶</span>}
     </div>
   )
 }
@@ -93,8 +96,8 @@ export default function KeyGrid({
   onMoveKey,
   onAddKey,
   onRemoveKey,
-  subpagePath,
-  onBackSubpage,
+  breadcrumbItems,
+  onBackToPath,
   isClientPage = false,
 }: KeyGridProps) {
   const sensors = useSensors(
@@ -114,12 +117,21 @@ export default function KeyGrid({
 
   return (
     <div>
-      {subpagePath.length > 0 && (
-        <div className="breadcrumb">
-          <button type="button" onClick={onBackSubpage}>
-            ← Back to tab
-          </button>
-        </div>
+      {breadcrumbItems.length > 1 && (
+        <nav className="breadcrumb" aria-label="Breadcrumb">
+          {breadcrumbItems.map((item, i) => (
+            <span key={i} className="breadcrumb-segment">
+              {i > 0 && <span className="breadcrumb-sep"> › </span>}
+              {i < breadcrumbItems.length - 1 ? (
+                <button type="button" onClick={() => onBackToPath(item.path)}>
+                  {item.label}
+                </button>
+              ) : (
+                <span className="breadcrumb-current">{item.label}</span>
+              )}
+            </span>
+          ))}
+        </nav>
       )}
       {isClientPage && (
         <p>
@@ -131,6 +143,7 @@ export default function KeyGrid({
         style={{
           gridTemplateColumns: `repeat(${cols}, minmax(80px, 1fr))`,
           gridTemplateRows: `repeat(${rows}, auto)`,
+          gridAutoFlow: 'column',
         }}
       >
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -154,17 +167,17 @@ export default function KeyGrid({
         </button>
         {selectedKeyIndex != null && !isClientPage && (
           <>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex - 1)} disabled={selectedKeyIndex <= 0}>
-              Move left
+            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex - 1)} disabled={selectedKeyIndex <= 0} title="Move up">
+              ↑
             </button>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex + 1)} disabled={selectedKeyIndex >= keys.length - 1}>
-              Move right
+            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex + 1)} disabled={selectedKeyIndex >= keys.length - 1} title="Move down">
+              ↓
             </button>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, Math.max(0, selectedKeyIndex - cols))} disabled={selectedKeyIndex < cols}>
-              Move up
+            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex - rows, true)} disabled={selectedKeyIndex < rows} title="Swap left">
+              ←
             </button>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, Math.min(keys.length, selectedKeyIndex + cols))} disabled={selectedKeyIndex >= keys.length - cols}>
-              Move down
+            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex + rows, true)} disabled={selectedKeyIndex + rows >= keys.length} title="Swap right">
+              →
             </button>
             <button type="button" onClick={onRemoveKey}>
               Remove key

@@ -5,7 +5,7 @@ interface HeaderProps {
   onProfileIdChange: (id: string) => void
   onNew: () => void
   onLoad: () => void
-  onSave: () => void
+  onSaveAs: () => void
   fileInputRef: RefObject<HTMLInputElement | null>
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
 }
@@ -15,7 +15,7 @@ export default function Header({
   onProfileIdChange,
   onNew,
   onLoad,
-  onSave,
+  onSaveAs,
   fileInputRef,
   onFileChange,
 }: HeaderProps) {
@@ -44,8 +44,8 @@ export default function Header({
         onChange={onFileChange}
         aria-hidden
       />
-      <button type="button" onClick={onSave}>
-        Save JSON
+      <button type="button" onClick={onSaveAs}>
+        Save as
       </button>
     </header>
   )
