@@ -17,7 +17,7 @@ export interface DirectAccessPage {
 }
 
 export interface Tab {
-  label: string;
+  label: string[];
   page: DirectAccessPage;
 }
 
@@ -33,7 +33,7 @@ export function createDefaultProfile(): TabbedProfile {
     type: 'Tabbed',
     tabs: [
       {
-        label: 'Tab 1',
+        label: ['Tab 1'],
         page: { rows: 4, keys: [] },
       },
     ],

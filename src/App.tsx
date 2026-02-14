@@ -44,7 +44,8 @@ function getBreadcrumbItems(profile: TabbedProfile, tabIndex: number, path: Subp
   const items: BreadcrumbItem[] = []
   const tab = profile.tabs[tabIndex]
   if (!tab) return items
-  items.push({ label: tab.label, path: [] })
+  // Use first line of label for breadcrumb
+  items.push({ label: tab.label[0] || 'Tab', path: [] })
   let page = tab.page
   for (let i = 0; i < path.length; i++) {
     const keys = page.keys ?? []
@@ -108,11 +109,17 @@ export default function App() {
     mutateProfile((p) => ({ ...p, id: id.trim() }))
   }, [mutateProfile])
 
-  const setTabLabel = useCallback(
-    (tabIndex: number, label: string) => {
+  const setTabLabelLine = useCallback(
+    (tabIndex: number, lineIndex: number, value: string) => {
       mutateProfile((p) => ({
         ...p,
-        tabs: p.tabs.map((t, i) => (i === tabIndex ? { ...t, label: label.trim() } : t)),
+        tabs: p.tabs.map((t, i) => {
+          if (i !== tabIndex) return t
+          const newLabel = [...t.label]
+          while (newLabel.length <= lineIndex) newLabel.push('')
+          newLabel[lineIndex] = value
+          return { ...t, label: newLabel.slice(0, 3) }
+        }),
       }))
     },
     [mutateProfile]
@@ -188,7 +195,7 @@ export default function App() {
   const addTab = useCallback(() => {
     mutateProfile((p) => ({
       ...p,
-      tabs: [...p.tabs, { label: `Tab ${p.tabs.length + 1}`, page: { rows: 4, keys: [] } }],
+      tabs: [...p.tabs, { label: [`Tab ${p.tabs.length + 1}`], page: { rows: 4, keys: [] } }],
     }))
     setSelectedTabIndex(profile.tabs.length)
     setSelectedKeyIndex(null)
@@ -435,12 +442,30 @@ export default function App() {
         <section className="tab-editor">
           <h3>Tab</h3>
           <label>
-            Label
+            Label line 1
             <input
               type="text"
-              value={profile.tabs[selectedTabIndex]?.label ?? ''}
-              onChange={(e) => setTabLabel(selectedTabIndex, e.target.value)}
-              placeholder="Tab label"
+              value={profile.tabs[selectedTabIndex]?.label[0] ?? ''}
+              onChange={(e) => setTabLabelLine(selectedTabIndex, 0, e.target.value)}
+              placeholder="First line"
+            />
+          </label>
+          <label>
+            Label line 2
+            <input
+              type="text"
+              value={profile.tabs[selectedTabIndex]?.label[1] ?? ''}
+              onChange={(e) => setTabLabelLine(selectedTabIndex, 1, e.target.value)}
+              placeholder="Second line (optional)"
+            />
+          </label>
+          <label>
+            Label line 3
+            <input
+              type="text"
+              value={profile.tabs[selectedTabIndex]?.label[2] ?? ''}
+              onChange={(e) => setTabLabelLine(selectedTabIndex, 2, e.target.value)}
+              placeholder="Third line (optional)"
             />
           </label>
           <label>

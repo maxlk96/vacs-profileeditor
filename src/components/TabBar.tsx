@@ -55,7 +55,11 @@ function SortableTab({
       {...attributes}
       {...listeners}
     >
-      {tab.label}
+      {tab.label.map((line, i) => (
+        <div key={i} className="tab-label-line">
+          {line}
+        </div>
+      ))}
     </button>
   )
 }
