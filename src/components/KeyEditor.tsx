@@ -81,7 +81,7 @@ export default function KeyEditor({
           onChange={(e) =>
             onUpdateKey((k) => ({
               ...k,
-              station_id: e.target.value.trim() || undefined,
+              station_id: e.target.value === '' ? undefined : e.target.value,
             }))
           }
           placeholder="e.g. LOWW_TWR"

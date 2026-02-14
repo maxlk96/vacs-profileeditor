@@ -367,11 +367,17 @@ export default function App() {
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
         if (selectedKeyIndex + currentRows < currentKeys.length) moveKey(selectedKeyIndex, selectedKeyIndex + currentRows, true)
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault()
+        if (selectedKeyIndex != null) updateKeyAtPath(subpagePath, selectedKeyIndex, () => ({ label: [] }))
+      } else if (e.key === 'Delete') {
+        e.preventDefault()
+        if (selectedKeyIndex != null) removeKey()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedKeyIndex, currentKeys.length, currentRows, isClientPage, moveKey, goToSubpage])
+  }, [selectedKeyIndex, currentKeys.length, currentRows, isClientPage, moveKey, goToSubpage, updateKeyAtPath, subpagePath, removeKey])
 
   const handleDoubleClickKey = useCallback(
     (index: number) => {
