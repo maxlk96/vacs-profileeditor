@@ -33,8 +33,20 @@ export function validateProfile(data: unknown): { ok: true; profile: TabbedProfi
       return;
     }
     const tab = t as Record<string, unknown>;
-    if (typeof tab.label !== 'string' || tab.label.trim() === '') {
-      errors.push({ path: `tabs[${i}].label`, message: 'Tab label must be non-empty' });
+    if (typeof tab.label === 'string') {
+      if (tab.label.trim() === '') {
+        errors.push({ path: `tabs[${i}].label`, message: 'Tab label must be non-empty' });
+      }
+    } else if (Array.isArray(tab.label)) {
+      if (tab.label.length === 0) {
+        errors.push({ path: `tabs[${i}].label`, message: 'Tab label must be non-empty' });
+      } else if (tab.label.some((l) => typeof l !== 'string')) {
+        errors.push({ path: `tabs[${i}].label`, message: 'Tab label must be an array of strings' });
+      } else if (tab.label.length > 3) {
+        errors.push({ path: `tabs[${i}].label`, message: 'Tab label can have at most 3 lines' });
+      }
+    } else {
+      errors.push({ path: `tabs[${i}].label`, message: 'Tab label must be a string or array of strings' });
     }
     if (tab.page == null || typeof tab.page !== 'object') {
       errors.push({ path: `tabs[${i}].page`, message: 'Tab must have a page' });
@@ -72,11 +84,15 @@ export function normalizeProfile(profile: TabbedProfile): TabbedProfile {
     type: 'Tabbed',
     tabs: profile.tabs.map((tab): Tab => {
       const page = tab.page as { rows?: number; keys?: DirectAccessKey[]; client_page?: unknown } | undefined
+      // Handle legacy string label or new string[] label
+      const rawLabel = tab.label as unknown as string | string[]
+      const label = Array.isArray(rawLabel) ? rawLabel.map(l => l.trim()) : [rawLabel.trim()]
+      
       if (page?.client_page != null) {
-        return { label: tab.label.trim(), page: { rows: Math.max(1, Math.floor(page.rows ?? 4)), client_page: page.client_page } }
+        return { label, page: { rows: Math.max(1, Math.floor(page.rows ?? 4)), client_page: page.client_page } }
       }
       return {
-        label: tab.label.trim(),
+        label,
         page: {
           rows: Math.max(1, Math.floor(page?.rows ?? 4)),
           keys: (page?.keys ?? []).map((k): DirectAccessKey => ({
