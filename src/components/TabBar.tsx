@@ -17,6 +17,7 @@ interface TabBarProps {
   onSelectTab: (index: number) => void
   onReorderTabs: (from: number, to: number) => void
   onAddTab: () => void
+  onDuplicateTab?: () => void
   onRemoveTab: () => void
 }
 
@@ -64,7 +65,7 @@ function SortableTab({
   )
 }
 
-export default function TabBar({ tabs, selectedIndex, onSelectTab, onReorderTabs, onAddTab, onRemoveTab }: TabBarProps) {
+export default function TabBar({ tabs, selectedIndex, onSelectTab, onReorderTabs, onAddTab, onDuplicateTab, onRemoveTab }: TabBarProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -93,12 +94,24 @@ export default function TabBar({ tabs, selectedIndex, onSelectTab, onReorderTabs
           ))}
         </SortableContext>
       </DndContext>
-      <button type="button" onClick={onAddTab} style={{ marginLeft: '0.5rem' }}>
-        + Tab
+      <button type="button" onClick={onAddTab} className="tab-bar-btn" title="Add tab" aria-label="Add tab">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+          <path d="M8 3v10M3 8h10" />
+        </svg>
       </button>
+      {onDuplicateTab && (
+        <button type="button" onClick={onDuplicateTab} className="tab-bar-btn" title="Duplicate tab" aria-label="Duplicate tab">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
+            <rect x="4" y="4" width="9" height="9" rx="1" />
+            <path d="M3 12V5a1 1 0 011-1h6" />
+          </svg>
+        </button>
+      )}
       {tabs.length > 1 && (
-        <button type="button" onClick={onRemoveTab} style={{ marginLeft: '0.25rem' }}>
-          Remove tab
+        <button type="button" onClick={onRemoveTab} className="tab-bar-btn" title="Remove tab" aria-label="Remove tab">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M3 4h10M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1M6 7v4M10 7v4M4 4l.5 9a1 1 0 001 1h5a1 1 0 001-1L12 4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </button>
       )}
     </div>

@@ -11,17 +11,22 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingS
 import { CSS } from '@dnd-kit/utilities'
 import type { DirectAccessKey } from '../types'
 import type { BreadcrumbItem, SubpagePath } from '../App'
+import { IconPlus, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconCopy, IconCut, IconPaste, IconTrash, IconSwap } from './Icons'
 
 interface KeyGridProps {
   keys: DirectAccessKey[]
   rows: number
-  selectedKeyIndex: number | null
-  onSelectKey: (index: number | null) => void
+  selectedKeyIndices: number[]
+  onSelectKey: (index: number, addToSelection: boolean, rangeSelect: boolean) => void
   onDoubleClickKey?: (index: number) => void
   onReorderKeys: (from: number, to: number) => void
-  onMoveKey: (from: number, to: number, swap?: boolean) => void
+  onMoveSelectedKeys?: (direction: 'up' | 'down' | 'left' | 'right') => void
   onAddKey: () => void
   onRemoveKey: () => void
+  onSwapKeys?: () => void
+  onCopyKeys?: () => void
+  onCutKeys?: () => void
+  onPasteKeys?: () => void
   breadcrumbItems: BreadcrumbItem[]
   onBackToPath: (path: SubpagePath) => void
   isClientPage?: boolean
@@ -37,7 +42,7 @@ function SortableKeyCell({
   keyData: DirectAccessKey
   index: number
   isSelected: boolean
-  onSelect: () => void
+  onSelect: (e: React.MouseEvent) => void
   onDoubleClick?: () => void
 }) {
   const {
@@ -81,7 +86,13 @@ function SortableKeyCell({
           {line2 && <span className="key-cell-line">{line2}</span>}
         </>
       )}
-      {hasSubpage && <span className="key-cell-subpage-indicator" title="Has subpage">▶</span>}
+      {hasSubpage && (
+        <span className="key-cell-subpage-indicator" title="Has subpage">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M6 4l4 4-4 4" />
+          </svg>
+        </span>
+      )}
     </div>
   )
 }
@@ -89,13 +100,17 @@ function SortableKeyCell({
 export default function KeyGrid({
   keys,
   rows,
-  selectedKeyIndex,
+  selectedKeyIndices,
   onSelectKey,
   onDoubleClickKey,
   onReorderKeys,
-  onMoveKey,
+  onMoveSelectedKeys,
   onAddKey,
   onRemoveKey,
+  onSwapKeys,
+  onCopyKeys,
+  onCutKeys,
+  onPasteKeys,
   breadcrumbItems,
   onBackToPath,
   isClientPage = false,
@@ -153,8 +168,8 @@ export default function KeyGrid({
                 key={i}
                 keyData={keyData}
                 index={i}
-                isSelected={i === selectedKeyIndex}
-                onSelect={() => onSelectKey(i)}
+                isSelected={selectedKeyIndices.includes(i)}
+                onSelect={(e) => onSelectKey(i, e.ctrlKey || e.metaKey, e.shiftKey)}
                 onDoubleClick={onDoubleClickKey ? () => onDoubleClickKey(i) : undefined}
               />
             ))}
@@ -162,25 +177,47 @@ export default function KeyGrid({
         </DndContext>
       </div>
       <div className="key-actions">
-        <button type="button" onClick={onAddKey} disabled={isClientPage}>
-          Add key
+        <button type="button" onClick={onAddKey} disabled={isClientPage} className="key-action-btn" title="Add key" aria-label="Add key">
+          <IconPlus />
         </button>
-        {selectedKeyIndex != null && !isClientPage && (
+        {selectedKeyIndices.length > 0 && !isClientPage && (
           <>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex - 1)} disabled={selectedKeyIndex <= 0} title="Move up">
-              ↑
-            </button>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex + 1)} disabled={selectedKeyIndex >= keys.length - 1} title="Move down">
-              ↓
-            </button>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex - rows, true)} disabled={selectedKeyIndex < rows} title="Swap left">
-              ←
-            </button>
-            <button type="button" onClick={() => onMoveKey(selectedKeyIndex, selectedKeyIndex + rows, true)} disabled={selectedKeyIndex + rows >= keys.length} title="Swap right">
-              →
-            </button>
-            <button type="button" onClick={onRemoveKey}>
-              Remove key
+            <div className="move-pad">
+              <button type="button" onClick={() => onMoveSelectedKeys?.('up')} disabled={!onMoveSelectedKeys || Math.min(...selectedKeyIndices) <= 0} className="key-action-btn move-pad-btn" title="Move up" aria-label="Move up">
+                <IconChevronUp />
+              </button>
+              <button type="button" onClick={() => onMoveSelectedKeys?.('down')} disabled={!onMoveSelectedKeys || Math.max(...selectedKeyIndices) >= keys.length - 1} className="key-action-btn move-pad-btn" title="Move down" aria-label="Move down">
+                <IconChevronDown />
+              </button>
+              <button type="button" onClick={() => onMoveSelectedKeys?.('left')} disabled={!onMoveSelectedKeys || Math.min(...selectedKeyIndices) < rows} className="key-action-btn move-pad-btn" title="Move left" aria-label="Move left">
+                <IconChevronLeft />
+              </button>
+              <button type="button" onClick={() => onMoveSelectedKeys?.('right')} disabled={!onMoveSelectedKeys || Math.max(...selectedKeyIndices) + rows >= keys.length} className="key-action-btn move-pad-btn" title="Move right" aria-label="Move right">
+                <IconChevronRight />
+              </button>
+            </div>
+            {onSwapKeys && (
+              <button type="button" onClick={onSwapKeys} className="key-action-btn" title="Swap positions" aria-label="Swap">
+                <IconSwap />
+              </button>
+            )}
+            {onCopyKeys && (
+              <button type="button" onClick={onCopyKeys} className="key-action-btn" title="Copy (Ctrl+C)" aria-label="Copy">
+                <IconCopy />
+              </button>
+            )}
+            {onCutKeys && (
+              <button type="button" onClick={onCutKeys} className="key-action-btn" title="Cut (Ctrl+X)" aria-label="Cut">
+                <IconCut />
+              </button>
+            )}
+            {onPasteKeys && (
+              <button type="button" onClick={onPasteKeys} className="key-action-btn" title="Paste (Ctrl+V)" aria-label="Paste">
+                <IconPaste />
+              </button>
+            )}
+            <button type="button" onClick={onRemoveKey} className="key-action-btn" title="Remove key" aria-label="Remove key">
+              <IconTrash />
             </button>
           </>
         )}

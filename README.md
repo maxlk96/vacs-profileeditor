@@ -6,8 +6,8 @@ A simple GUI to create and edit **VACS tabbed profiles** without manually editin
 Profiles define the layout of direct-access keys for the [VATSIM ATC Communication System (vacs)](https://github.com/MorpheusXAUT/vacs) client.
 
 - **JSON import/export**: Load a profile from a `.json` file, edit in the UI, save as JSON (download).
-- **Tabs**: Add, remove, reorder tabs (including **drag-and-drop**). Edit tab label and row count.
-- **Keys**: Add, remove, reorder keys (including **drag-and-drop** in the grid). Move key left/right/up/down. Edit label (up to 3 lines), station ID, and optional subpage.
+- **Tabs**: Add, duplicate, remove, reorder tabs (including **drag-and-drop**). Edit tab label and row count.
+- **Keys**: Add, remove, reorder keys (including **drag-and-drop** in the grid). **Multi-select** with Ctrl+click (or Shift+click for range) to move several at once. **Copy/cut/paste** keys (Ctrl+C/X/V). Move key left/right/up/down. Edit label (up to 3 lines), station ID, and optional subpage.
 - **Client-page tabs**: Tabs that use `client_page` (dynamic client list) are shown as read-only.
 
 ## Keyboard shortcuts
@@ -17,13 +17,16 @@ Profiles define the layout of direct-access keys for the [VATSIM ATC Communicati
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
 | `Ctrl+Y` | Redo |
+| `Ctrl+C` | Copy selected key(s) |
+| `Ctrl+X` | Cut selected key(s) |
+| `Ctrl+V` | Paste key(s) |
 | `Enter` | Open subpage (when a key with subpage is selected) |
-| `↑` `↓` | Move selected key up/down |
-| `←` `→` | Swap selected key with key to the left/right |
+| `↑` `↓` | Move selected key(s) up/down |
+| `←` `→` | Move selected key(s) left/right |
 | `C` | Clear selected key |
-| `Delete` | Remove selected key |
+| `Delete` | Remove selected key(s) |
 
-*Shortcuts are disabled when typing in an input field.*
+*Shortcuts are disabled when typing in an input field. Use Ctrl+click to add to selection, Shift+click for range select.*
 
 # Contributing
 

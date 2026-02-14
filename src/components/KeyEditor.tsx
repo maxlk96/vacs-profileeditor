@@ -1,9 +1,11 @@
 import type { RefObject } from 'react'
 import type { DirectAccessKey } from '../types'
+import { IconPlus, IconTrash, IconClear, IconChevronRightSmall } from './Icons'
 
 interface KeyEditorProps {
   keyData: DirectAccessKey | null
   keyIndex: number | null
+  selectedCount?: number
   stationIdInputRef?: RefObject<HTMLInputElement | null>
   onUpdateKey: (updater: (k: DirectAccessKey) => DirectAccessKey) => void
   onRemoveKey: () => void
@@ -15,6 +17,7 @@ interface KeyEditorProps {
 export default function KeyEditor({
   keyData,
   keyIndex,
+  selectedCount = 1,
   stationIdInputRef,
   onUpdateKey,
   onRemoveKey,
@@ -25,7 +28,7 @@ export default function KeyEditor({
   if (keyData == null || keyIndex == null) {
     return (
       <section className="key-editor">
-        <p className="key-editor-placeholder">Select a key</p>
+        <p className="key-editor-placeholder">Select a key (Ctrl+click for multiple)</p>
       </section>
     )
   }
@@ -44,7 +47,7 @@ export default function KeyEditor({
 
   return (
     <section className="key-editor">
-      <h3>Key</h3>
+      <h3>Key{selectedCount > 1 ? ` (${selectedCount} selected)` : ''}</h3>
       <label>
         Label line 1
         <input
@@ -89,33 +92,39 @@ export default function KeyEditor({
       </label>
       {hasSubpage ? (
         <div className="key-editor-subpage-actions">
-          <button type="button" onClick={onGoToSubpage}>
-            Edit subpage
+          <button type="button" onClick={onGoToSubpage} className="key-editor-btn" title="Edit subpage" aria-label="Edit subpage">
+            <IconChevronRightSmall />
+            <span>Edit subpage</span>
           </button>
-          <button type="button" onClick={onRemoveSubpage}>
-            Remove subpage
+          <button type="button" onClick={onRemoveSubpage} className="key-editor-btn" title="Remove subpage" aria-label="Remove subpage">
+            <IconTrash />
+            <span>Remove subpage</span>
           </button>
         </div>
       ) : (
-        <div>
-          <button
-            type="button"
-            onClick={() =>
-              onUpdateKey((k) => ({
-                ...k,
-                page: { rows: 4, keys: [] },
-              }))
-            }
-          >
-            Add subpage
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() =>
+            onUpdateKey((k) => ({
+              ...k,
+              page: { rows: 4, keys: [] },
+            }))
+          }
+          className="key-editor-btn"
+          title="Add subpage"
+          aria-label="Add subpage"
+        >
+          <IconPlus />
+          <span>Add subpage</span>
+        </button>
       )}
-      <button type="button" onClick={() => onUpdateKey(() => ({ label: [] }))}>
-        Clear key
+      <button type="button" onClick={() => onUpdateKey(() => ({ label: [] }))} className="key-editor-btn" title="Clear key" aria-label="Clear key">
+        <IconClear />
+        <span>Clear key</span>
       </button>
-      <button type="button" onClick={onRemoveKey}>
-        Remove key
+      <button type="button" onClick={onRemoveKey} className="key-editor-btn" title="Remove key" aria-label="Remove key">
+        <IconTrash />
+        <span>Remove key</span>
       </button>
     </section>
   )

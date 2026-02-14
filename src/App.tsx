@@ -7,6 +7,7 @@ import Header from './components/Header'
 import TabBar from './components/TabBar'
 import KeyGrid from './components/KeyGrid'
 import KeyEditor from './components/KeyEditor'
+import { IconUndo, IconRedo } from './components/Icons'
 
 /** Path into nested pages: [keyIndex, keyIndex, ...] to reach the current page. Empty = top-level tab page. */
 export type SubpagePath = number[]
@@ -61,14 +62,15 @@ function getBreadcrumbItems(profile: TabbedProfile, tabIndex: number, path: Subp
 }
 
 export default function App() {
-  const { profile, mutateProfile, replaceProfile, undo, redo } = useProfileHistory(createDefaultProfile())
+  const { profile, mutateProfile, replaceProfile, undo, redo, canUndo, canRedo } = useProfileHistory(createDefaultProfile())
   const [selectedTabIndex, setSelectedTabIndex] = useState(0)
-  const [selectedKeyIndex, setSelectedKeyIndex] = useState<number | null>(null)
+  const [selectedKeyIndices, setSelectedKeyIndices] = useState<number[]>([])
   const [subpagePath, setSubpagePath] = useState<SubpagePath>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showNewProfileConfirm, setShowNewProfileConfirm] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const stationIdInputRef = useRef<HTMLInputElement>(null)
+  const keyClipboardRef = useRef<{ keys: DirectAccessKey[]; cut: boolean } | null>(null)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -95,10 +97,8 @@ export default function App() {
 
   useEffect(() => {
     const keys = getKeysAtPath(profile, selectedTabIndex, subpagePath)
-    if (selectedKeyIndex != null && selectedKeyIndex >= keys.length) {
-      setSelectedKeyIndex(null)
-    }
-  }, [profile, selectedTabIndex, subpagePath, selectedKeyIndex])
+    setSelectedKeyIndices((prev) => prev.filter((i) => i < keys.length))
+  }, [profile, selectedTabIndex, subpagePath])
 
   const currentPage = getPageAtPath(profile, selectedTabIndex, subpagePath)
   const currentKeys = getKeysAtPath(profile, selectedTabIndex, subpagePath)
@@ -198,15 +198,29 @@ export default function App() {
       tabs: [...p.tabs, { label: [`Tab ${p.tabs.length + 1}`], page: { rows: 4, keys: [] } }],
     }))
     setSelectedTabIndex(profile.tabs.length)
-    setSelectedKeyIndex(null)
+    setSelectedKeyIndices([])
     setSubpagePath([])
   }, [mutateProfile, profile.tabs.length])
+
+  const duplicateTab = useCallback(() => {
+    const tab = profile.tabs[selectedTabIndex]
+    if (!tab) return
+    const dup = JSON.parse(JSON.stringify(tab)) as typeof tab
+    mutateProfile((p) => {
+      const tabs = [...p.tabs]
+      tabs.splice(selectedTabIndex + 1, 0, dup)
+      return { ...p, tabs }
+    })
+    setSelectedTabIndex(selectedTabIndex + 1)
+    setSelectedKeyIndices([])
+    setSubpagePath([])
+  }, [mutateProfile, profile.tabs, selectedTabIndex])
 
   const removeTab = useCallback(() => {
     if (profile.tabs.length <= 1) return
     mutateProfile((p) => ({ ...p, tabs: p.tabs.filter((_, i) => i !== selectedTabIndex) }))
     setSelectedTabIndex(Math.max(0, selectedTabIndex - 1))
-    setSelectedKeyIndex(null)
+    setSelectedKeyIndices([])
     setSubpagePath([])
   }, [mutateProfile, profile.tabs.length, selectedTabIndex])
 
@@ -230,17 +244,17 @@ export default function App() {
       ...page,
       keys: [...(page.keys ?? []), { label: [] }],
     }))
-    setSelectedKeyIndex(currentKeys.length)
+    setSelectedKeyIndices([currentKeys.length])
   }, [mutatePageAtPath, subpagePath, currentKeys.length])
 
   const removeKey = useCallback(() => {
-    if (selectedKeyIndex == null) return
+    if (selectedKeyIndices.length === 0) return
     mutatePageAtPath(subpagePath, (page) => ({
       ...page,
-      keys: (page.keys ?? []).filter((_, i) => i !== selectedKeyIndex),
+      keys: (page.keys ?? []).filter((_, i) => !selectedKeyIndices.includes(i)),
     }))
-    setSelectedKeyIndex(null)
-  }, [mutatePageAtPath, subpagePath, selectedKeyIndex])
+    setSelectedKeyIndices([])
+  }, [mutatePageAtPath, subpagePath, selectedKeyIndices])
 
   const moveKey = useCallback(
     (from: number, to: number, swap = false) => {
@@ -256,10 +270,118 @@ export default function App() {
         }
         return { ...page, keys: nextKeys }
       })
-      setSelectedKeyIndex(to)
+      setSelectedKeyIndices([to])
     },
     [mutatePageAtPath, subpagePath, currentKeys.length]
   )
+
+  const swapSelectedKeys = useCallback(() => {
+    if (selectedKeyIndices.length !== 2) return
+    const [a, b] = [...selectedKeyIndices].sort((x, y) => x - y)
+    mutatePageAtPath(subpagePath, (page) => {
+      const keys = [...(page.keys ?? [])]
+      ;[keys[a], keys[b]] = [keys[b], keys[a]]
+      return { ...page, keys }
+    })
+  }, [selectedKeyIndices, mutatePageAtPath, subpagePath])
+
+  const moveSelectedKeys = useCallback(
+    (direction: 'up' | 'down' | 'left' | 'right') => {
+      const sorted = [...selectedKeyIndices].sort((a, b) => a - b)
+      if (sorted.length === 0) return
+      if (direction === 'left' || direction === 'right') {
+        const rows = currentRows
+        if (direction === 'left') {
+          if (Math.min(...sorted) < rows) return
+          if (sorted.length === 1) {
+            moveKey(sorted[0], sorted[0] - rows, true)
+          } else {
+            const keys = [...currentKeys]
+            for (const i of sorted) {
+              ;[keys[i], keys[i - rows]] = [keys[i - rows], keys[i]]
+            }
+            mutatePageAtPath(subpagePath, (page) => ({ ...page, keys }))
+            setSelectedKeyIndices(sorted.map((i) => i - rows))
+          }
+        } else {
+          if (Math.max(...sorted) + rows >= currentKeys.length) return
+          if (sorted.length === 1) {
+            moveKey(sorted[0], sorted[0] + rows, true)
+          } else {
+            const keys = [...currentKeys]
+            for (const i of [...sorted].sort((a, b) => b - a)) {
+              ;[keys[i], keys[i + rows]] = [keys[i + rows], keys[i]]
+            }
+            mutatePageAtPath(subpagePath, (page) => ({ ...page, keys }))
+            setSelectedKeyIndices(sorted.map((i) => i + rows))
+          }
+        }
+        return
+      }
+      if (sorted.length === 1) {
+        if (direction === 'up' && sorted[0] > 0) moveKey(sorted[0], sorted[0] - 1)
+        else if (direction === 'down' && sorted[0] < currentKeys.length - 1) moveKey(sorted[0], sorted[0] + 1)
+        return
+      }
+      const keys = currentKeys
+      const block = sorted.map((i) => keys[i])
+      const remaining = keys.filter((_, i) => !sorted.includes(i))
+      const min = sorted[0]!
+      const max = sorted[sorted.length - 1]!
+      if (direction === 'up' && min > 0) {
+        const insertAt = min - 1
+        const newKeys = [...remaining.slice(0, insertAt), ...block, ...remaining.slice(insertAt)]
+        mutatePageAtPath(subpagePath, (page) => ({ ...page, keys: newKeys }))
+        setSelectedKeyIndices(block.map((_, i) => insertAt + i))
+      } else if (direction === 'down' && max < keys.length - 1) {
+        const keys = [...currentKeys]
+        for (const i of [...sorted].sort((a, b) => b - a)) {
+          ;[keys[i], keys[i + 1]] = [keys[i + 1], keys[i]]
+        }
+        mutatePageAtPath(subpagePath, (page) => ({ ...page, keys }))
+        setSelectedKeyIndices(sorted.map((i) => i + 1))
+      }
+    },
+    [selectedKeyIndices, currentKeys, currentRows, mutatePageAtPath, subpagePath, moveKey]
+  )
+
+  const copyKeys = useCallback(() => {
+    if (selectedKeyIndices.length === 0) return
+    const keys = selectedKeyIndices
+      .sort((a, b) => a - b)
+      .map((i) => currentKeys[i])
+      .filter(Boolean)
+    if (keys.length > 0) keyClipboardRef.current = { keys: JSON.parse(JSON.stringify(keys)), cut: false }
+  }, [selectedKeyIndices, currentKeys])
+
+  const cutKeys = useCallback(() => {
+    if (selectedKeyIndices.length === 0) return
+    const keys = selectedKeyIndices
+      .sort((a, b) => a - b)
+      .map((i) => currentKeys[i])
+      .filter(Boolean)
+    if (keys.length > 0) {
+      keyClipboardRef.current = { keys: JSON.parse(JSON.stringify(keys)), cut: true }
+      mutatePageAtPath(subpagePath, (page) => ({
+        ...page,
+        keys: (page.keys ?? []).filter((_, i) => !selectedKeyIndices.includes(i)),
+      }))
+      setSelectedKeyIndices([])
+    }
+  }, [selectedKeyIndices, currentKeys, mutatePageAtPath, subpagePath])
+
+  const pasteKeys = useCallback(() => {
+    const clip = keyClipboardRef.current
+    if (!clip || clip.keys.length === 0) return
+    const insertAt = selectedKeyIndices.length > 0 ? Math.max(...selectedKeyIndices) + 1 : currentKeys.length
+    mutatePageAtPath(subpagePath, (page) => {
+      const keys = page.keys ?? []
+      const nextKeys = [...keys.slice(0, insertAt), ...clip.keys, ...keys.slice(insertAt)]
+      return { ...page, keys: nextKeys }
+    })
+    setSelectedKeyIndices(clip.keys.map((_, i) => insertAt + i))
+    if (clip.cut) keyClipboardRef.current = null
+  }, [selectedKeyIndices, currentKeys.length, mutatePageAtPath, subpagePath])
 
   const reorderKeys = useCallback(
     (from: number, to: number) => {
@@ -286,7 +408,7 @@ export default function App() {
         if (result.ok) {
           replaceProfile(normalizeProfile(result.profile))
           setSelectedTabIndex(0)
-          setSelectedKeyIndex(null)
+          setSelectedKeyIndices([])
           setSubpagePath([])
         } else {
           setLoadError(result.errors.map((err) => `${err.path}: ${err.message}`).join('; '))
@@ -320,7 +442,7 @@ export default function App() {
   const applyNewProfile = useCallback(() => {
     replaceProfile(createDefaultProfile())
     setSelectedTabIndex(0)
-    setSelectedKeyIndex(null)
+    setSelectedKeyIndices([])
     setSubpagePath([])
     setLoadError(null)
     setShowNewProfileConfirm(false)
@@ -343,48 +465,82 @@ export default function App() {
 
   const goBackToPath = useCallback((path: SubpagePath) => {
     setSubpagePath(path)
-    setSelectedKeyIndex(null)
+    setSelectedKeyIndices([])
   }, [])
 
   const goToSubpage = useCallback((keyIndex: number) => {
     setSubpagePath((path) => [...path, keyIndex])
-    setSelectedKeyIndex(null)
+    setSelectedKeyIndices([])
   }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as Node
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
-      if (selectedKeyIndex == null || isClientPage) return
-      if (e.key === 'Enter') {
-        const key = currentKeys[selectedKeyIndex]
-        if (key?.page != null) {
-          e.preventDefault()
-          goToSubpage(selectedKeyIndex)
+      if (selectedKeyIndices.length === 0 || isClientPage) return
+      if (e.ctrlKey && e.key === 'c') {
+        e.preventDefault()
+        copyKeys()
+      } else if (e.ctrlKey && e.key === 'x') {
+        e.preventDefault()
+        cutKeys()
+      } else if (e.ctrlKey && e.key === 'v') {
+        e.preventDefault()
+        pasteKeys()
+      } else if (e.key === 'Enter') {
+        const primary = selectedKeyIndices[0]
+        if (primary != null) {
+          const key = currentKeys[primary]
+          if (key?.page != null) {
+            e.preventDefault()
+            goToSubpage(primary)
+          }
         }
       } else if (e.key === 'ArrowUp') {
         e.preventDefault()
-        if (selectedKeyIndex > 0) moveKey(selectedKeyIndex, selectedKeyIndex - 1)
+        moveSelectedKeys('up')
       } else if (e.key === 'ArrowDown') {
         e.preventDefault()
-        if (selectedKeyIndex < currentKeys.length - 1) moveKey(selectedKeyIndex, selectedKeyIndex + 1)
+        moveSelectedKeys('down')
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        if (selectedKeyIndex >= currentRows) moveKey(selectedKeyIndex, selectedKeyIndex - currentRows, true)
+        if (selectedKeyIndices.length > 0 && Math.min(...selectedKeyIndices) >= currentRows) {
+          moveSelectedKeys('left')
+        }
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        if (selectedKeyIndex + currentRows < currentKeys.length) moveKey(selectedKeyIndex, selectedKeyIndex + currentRows, true)
+        if (selectedKeyIndices.length > 0 && Math.max(...selectedKeyIndices) + currentRows < currentKeys.length) {
+          moveSelectedKeys('right')
+        }
       } else if (e.key === 'c' || e.key === 'C') {
-        e.preventDefault()
-        if (selectedKeyIndex != null) updateKeyAtPath(subpagePath, selectedKeyIndex, () => ({ label: [] }))
+        if (!e.ctrlKey) {
+          e.preventDefault()
+          if (selectedKeyIndices.length === 1) updateKeyAtPath(subpagePath, selectedKeyIndices[0]!, () => ({ label: [] }))
+        }
       } else if (e.key === 'Delete') {
         e.preventDefault()
-        if (selectedKeyIndex != null) removeKey()
+        removeKey()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedKeyIndex, currentKeys.length, currentRows, isClientPage, moveKey, goToSubpage, updateKeyAtPath, subpagePath, removeKey])
+  }, [selectedKeyIndices, currentKeys, currentRows, isClientPage, moveKey, moveSelectedKeys, goToSubpage, updateKeyAtPath, subpagePath, removeKey, copyKeys, cutKeys, pasteKeys])
+
+  const handleSelectKey = useCallback((index: number, addToSelection: boolean, rangeSelect: boolean) => {
+    if (rangeSelect && selectedKeyIndices.length > 0) {
+      const anchor = selectedKeyIndices[0]!
+      const start = Math.min(anchor, index)
+      const end = Math.max(anchor, index)
+      const indices = Array.from({ length: end - start + 1 }, (_, i) => start + i)
+      setSelectedKeyIndices(indices)
+    } else if (addToSelection) {
+      setSelectedKeyIndices((prev) =>
+        prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index].sort((a, b) => a - b)
+      )
+    } else {
+      setSelectedKeyIndices([index])
+    }
+  }, [selectedKeyIndices])
 
   const handleDoubleClickKey = useCallback(
     (index: number) => {
@@ -392,14 +548,15 @@ export default function App() {
       if (key?.page != null) {
         goToSubpage(index)
       } else {
-        setSelectedKeyIndex(index)
+        setSelectedKeyIndices([index])
         setTimeout(() => stationIdInputRef.current?.focus(), 50)
       }
     },
     [currentKeys, goToSubpage]
   )
 
-  const selectedKey = selectedKeyIndex != null ? currentKeys[selectedKeyIndex] ?? null : null
+  const primaryKeyIndex = selectedKeyIndices.length > 0 ? selectedKeyIndices[0]! : null
+  const selectedKey = primaryKeyIndex != null ? currentKeys[primaryKeyIndex] ?? null : null
 
   return (
     <div className="app">
@@ -442,6 +599,7 @@ export default function App() {
         onSelectTab={setSelectedTabIndex}
         onReorderTabs={reorderTabs}
         onAddTab={addTab}
+        onDuplicateTab={duplicateTab}
         onRemoveTab={removeTab}
       />
       <main className="main-content">
@@ -488,39 +646,56 @@ export default function App() {
           <KeyGrid
             keys={currentKeys}
             rows={currentRows}
-            selectedKeyIndex={selectedKeyIndex}
-            onSelectKey={setSelectedKeyIndex}
+            selectedKeyIndices={selectedKeyIndices}
+            onSelectKey={handleSelectKey}
             onDoubleClickKey={handleDoubleClickKey}
             onReorderKeys={reorderKeys}
-            onMoveKey={moveKey}
+            onMoveSelectedKeys={moveSelectedKeys}
             onAddKey={addKey}
             onRemoveKey={removeKey}
+            onSwapKeys={selectedKeyIndices.length === 2 ? swapSelectedKeys : undefined}
+            onCopyKeys={copyKeys}
+            onCutKeys={cutKeys}
+            onPasteKeys={pasteKeys}
             breadcrumbItems={getBreadcrumbItems(profile, selectedTabIndex, subpagePath)}
             onBackToPath={goBackToPath}
             isClientPage={isClientPage}
           />
         </section>
-        <KeyEditor
-          keyData={selectedKey}
-          keyIndex={selectedKeyIndex}
-          stationIdInputRef={stationIdInputRef}
-          onUpdateKey={(updater) => {
-            if (selectedKeyIndex == null) return
-            updateKeyAtPath(subpagePath, selectedKeyIndex, updater)
-          }}
-          onRemoveKey={removeKey}
-          onGoToSubpage={selectedKeyIndex != null ? () => goToSubpage(selectedKeyIndex) : undefined}
-          onRemoveSubpage={
-            selectedKey?.page != null
-              ? () => {
-                  if (selectedKeyIndex == null) return
-                  updateKeyAtPath(subpagePath, selectedKeyIndex, (k) => ({ ...k, page: undefined }))
-                  setSelectedKeyIndex(null)
-                }
-              : undefined
-          }
-          hasSubpage={selectedKey?.page != null}
-        />
+        <aside className="main-sidebar">
+          <div className="undo-redo-bar">
+            <button type="button" onClick={undo} disabled={!canUndo} className="undo-redo-btn" title="Undo (Ctrl+Z)" aria-label="Undo">
+              <IconUndo />
+            </button>
+            <button type="button" onClick={redo} disabled={!canRedo} className="undo-redo-btn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+              <IconRedo />
+            </button>
+          </div>
+          <div className="key-editor-wrap">
+            <KeyEditor
+              keyData={selectedKey}
+              keyIndex={primaryKeyIndex}
+              selectedCount={selectedKeyIndices.length}
+              stationIdInputRef={stationIdInputRef}
+              onUpdateKey={(updater) => {
+                if (primaryKeyIndex == null) return
+                updateKeyAtPath(subpagePath, primaryKeyIndex, updater)
+              }}
+              onRemoveKey={removeKey}
+              onGoToSubpage={primaryKeyIndex != null ? () => goToSubpage(primaryKeyIndex) : undefined}
+              onRemoveSubpage={
+                selectedKey?.page != null
+                  ? () => {
+                      if (primaryKeyIndex == null) return
+                      updateKeyAtPath(subpagePath, primaryKeyIndex, (k) => ({ ...k, page: undefined }))
+                      setSelectedKeyIndices([])
+                    }
+                  : undefined
+              }
+              hasSubpage={selectedKey?.page != null}
+            />
+          </div>
+        </aside>
       </main>
     </div>
   )
