@@ -10,6 +10,21 @@ Profiles define the layout of direct-access keys for the [VATSIM ATC Communicati
 - **Keys**: Add, remove, reorder keys (including **drag-and-drop** in the grid). Move key left/right/up/down. Edit label (up to 3 lines), station ID, and optional subpage.
 - **Client-page tabs**: Tabs that use `client_page` (dynamic client list) are shown as read-only.
 
+## Keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Z` | Undo |
+| `Ctrl+Shift+Z` | Redo |
+| `Ctrl+Y` | Redo |
+| `Enter` | Open subpage (when a key with subpage is selected) |
+| `↑` `↓` | Move selected key up/down |
+| `←` `→` | Swap selected key with key to the left/right |
+| `C` | Clear selected key |
+| `Delete` | Remove selected key |
+
+*Shortcuts are disabled when typing in an input field.*
+
 # Contributing
 
 Forks and PRs are encouraged!
