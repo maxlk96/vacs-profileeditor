@@ -324,21 +324,21 @@ export default function App() {
         return
       }
       const keys = currentKeys
-      const block = sorted.map((i) => keys[i])
-      const remaining = keys.filter((_, i) => !sorted.includes(i))
       const min = sorted[0]!
       const max = sorted[sorted.length - 1]!
       if (direction === 'up' && min > 0) {
-        const insertAt = min - 1
-        const newKeys = [...remaining.slice(0, insertAt), ...block, ...remaining.slice(insertAt)]
-        mutatePageAtPath(subpagePath, (page) => ({ ...page, keys: newKeys }))
-        setSelectedKeyIndices(block.map((_, i) => insertAt + i))
-      } else if (direction === 'down' && max < keys.length - 1) {
-        const keys = [...currentKeys]
-        for (const i of [...sorted].sort((a, b) => b - a)) {
-          ;[keys[i], keys[i + 1]] = [keys[i + 1], keys[i]]
+        const nextKeys = [...keys]
+        for (const i of sorted) {
+          ;[nextKeys[i - 1], nextKeys[i]] = [nextKeys[i], nextKeys[i - 1]]
         }
-        mutatePageAtPath(subpagePath, (page) => ({ ...page, keys }))
+        mutatePageAtPath(subpagePath, (page) => ({ ...page, keys: nextKeys }))
+        setSelectedKeyIndices(sorted.map((i) => i - 1))
+      } else if (direction === 'down' && max < keys.length - 1) {
+        const nextKeys = [...keys]
+        for (const i of [...sorted].sort((a, b) => b - a)) {
+          ;[nextKeys[i], nextKeys[i + 1]] = [nextKeys[i + 1], nextKeys[i]]
+        }
+        mutatePageAtPath(subpagePath, (page) => ({ ...page, keys: nextKeys }))
         setSelectedKeyIndices(sorted.map((i) => i + 1))
       }
     },
