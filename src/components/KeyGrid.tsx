@@ -11,6 +11,8 @@ import { SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingS
 import { CSS } from '@dnd-kit/utilities'
 import type { DirectAccessKey } from '../types'
 import type { BreadcrumbItem, SubpagePath } from '../App'
+import type { StationEntry } from '../lib/vacsStations'
+import { hasStationIdMismatch } from '../lib/stationIdMatch'
 import { IconPlus, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconCopy, IconCut, IconPaste, IconTrash, IconSwap } from './Icons'
 
 interface KeyGridProps {
@@ -30,18 +32,21 @@ interface KeyGridProps {
   breadcrumbItems: BreadcrumbItem[]
   onBackToPath: (path: SubpagePath) => void
   isClientPage?: boolean
+  stations?: StationEntry[] | null
 }
 
 function SortableKeyCell({
   keyData,
   index,
   isSelected,
+  hasStationMismatch,
   onSelect,
   onDoubleClick,
 }: {
   keyData: DirectAccessKey
   index: number
   isSelected: boolean
+  hasStationMismatch: boolean
   onSelect: (e: React.MouseEvent) => void
   onDoubleClick?: () => void
 }) {
@@ -70,13 +75,20 @@ function SortableKeyCell({
   return (
     <div
       ref={setNodeRef}
-      className={`key-cell ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isEmpty ? 'key-cell-empty' : ''} ${hasNoStation ? 'key-cell-no-station' : ''} ${hasSubpage ? 'key-cell-has-subpage' : ''}`}
+      className={`key-cell ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isEmpty ? 'key-cell-empty' : ''} ${hasNoStation ? 'key-cell-no-station' : ''} ${hasSubpage ? 'key-cell-has-subpage' : ''} ${hasStationMismatch ? 'key-cell-station-mismatch' : ''}`}
       style={style}
       onClick={onSelect}
       onDoubleClick={onDoubleClick}
       {...attributes}
       {...listeners}
     >
+      {hasStationMismatch && (
+        <span className="key-cell-mismatch-indicator" title="Station ID not found in VACS dataset" aria-hidden>
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+            <path d="M8 1L15 14H1L8 1zm0 5v3h1V6H8zm0 4v1h1v-1H8z" />
+          </svg>
+        </span>
+      )}
       {isEmpty ? (
         '(blank)'
       ) : (
@@ -114,6 +126,7 @@ export default function KeyGrid({
   breadcrumbItems,
   onBackToPath,
   isClientPage = false,
+  stations = null,
 }: KeyGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -169,6 +182,7 @@ export default function KeyGrid({
                 keyData={keyData}
                 index={i}
                 isSelected={selectedKeyIndices.includes(i)}
+                hasStationMismatch={hasStationIdMismatch(keyData.station_id, stations)}
                 onSelect={(e) => onSelectKey(i, e.ctrlKey || e.metaKey, e.shiftKey)}
                 onDoubleClick={onDoubleClickKey ? () => onDoubleClickKey(i) : undefined}
               />

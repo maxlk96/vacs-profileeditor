@@ -3,6 +3,7 @@ import type { TabbedProfile, DirectAccessKey, DirectAccessPage } from './types'
 import { createDefaultProfile } from './types'
 import { validateProfile, normalizeProfile } from './lib/validation'
 import { useProfileHistory } from './hooks/useProfileHistory'
+import { loadStations } from './lib/vacsStations'
 import Header from './components/Header'
 import TabBar from './components/TabBar'
 import KeyGrid from './components/KeyGrid'
@@ -68,9 +69,31 @@ export default function App() {
   const [subpagePath, setSubpagePath] = useState<SubpagePath>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showNewProfileConfirm, setShowNewProfileConfirm] = useState(false)
+  const [stations, setStations] = useState<{ id: string; fir: string }[] | null>(null)
+  const [stationIdsLoadError, setStationIdsLoadError] = useState<string | null>(null)
+  const [stationIdsLoading, setStationIdsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const stationIdInputRef = useRef<HTMLInputElement>(null)
   const keyClipboardRef = useRef<{ keys: DirectAccessKey[]; cut: boolean } | null>(null)
+
+  const loadStationsFromGitHub = useCallback(() => {
+    if (stationIdsLoading) return
+    setStationIdsLoadError(null)
+    setStationIdsLoading(true)
+    loadStations()
+      .then(setStations)
+      .catch((err) => setStationIdsLoadError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setStationIdsLoading(false))
+  }, [stationIdsLoading])
+
+  useEffect(() => {
+    setStationIdsLoadError(null)
+    setStationIdsLoading(true)
+    loadStations()
+      .then(setStations)
+      .catch((err) => setStationIdsLoadError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setStationIdsLoading(false))
+  }, [])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -660,6 +683,7 @@ export default function App() {
             breadcrumbItems={getBreadcrumbItems(profile, selectedTabIndex, subpagePath)}
             onBackToPath={goBackToPath}
             isClientPage={isClientPage}
+            stations={stations}
           />
         </section>
         <aside className="main-sidebar">
@@ -677,6 +701,10 @@ export default function App() {
               keyIndex={primaryKeyIndex}
               selectedCount={selectedKeyIndices.length}
               stationIdInputRef={stationIdInputRef}
+              stations={stations}
+              stationIdsLoadError={stationIdsLoadError}
+              stationIdsLoading={stationIdsLoading}
+              onLoadStations={loadStationsFromGitHub}
               onUpdateKey={(updater) => {
                 if (primaryKeyIndex == null) return
                 updateKeyAtPath(subpagePath, primaryKeyIndex, updater)
