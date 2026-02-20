@@ -18,6 +18,7 @@ interface KeyEditorProps {
   stationIdsLoading?: boolean
   onLoadStations?: () => void
   onUpdateKey: (updater: (k: DirectAccessKey) => DirectAccessKey) => void
+  onClearKeys: () => void
   onRemoveKey: () => void
   onGoToSubpage?: () => void
   onRemoveSubpage?: () => void
@@ -64,6 +65,7 @@ export default function KeyEditor({
   stationIdsLoading = false,
   onLoadStations,
   onUpdateKey,
+  onClearKeys,
   onRemoveKey,
   onGoToSubpage,
   onRemoveSubpage,
@@ -308,9 +310,9 @@ export default function KeyEditor({
           <span>Add subpage</span>
         </button>
       )}
-      <button type="button" onClick={() => onUpdateKey(() => ({ label: [] }))} className="key-editor-btn" title="Clear key" aria-label="Clear key">
+      <button type="button" onClick={onClearKeys} className="key-editor-btn" title={selectedCount > 1 ? `Clear ${selectedCount} keys` : 'Clear key'} aria-label={selectedCount > 1 ? `Clear ${selectedCount} keys` : 'Clear key'}>
         <IconClear />
-        <span>Clear key</span>
+        <span>{selectedCount > 1 ? `Clear ${selectedCount} keys` : 'Clear key'}</span>
       </button>
       <button type="button" onClick={onRemoveKey} className="key-editor-btn" title="Remove key" aria-label="Remove key">
         <IconTrash />

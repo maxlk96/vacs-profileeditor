@@ -96,6 +96,17 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('button') || target.closest('.key-cell')) {
+        e.preventDefault()
+      }
+    }
+    document.addEventListener('mousedown', handler, true)
+    return () => document.removeEventListener('mousedown', handler, true)
+  }, [])
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as Node
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
@@ -277,6 +288,15 @@ export default function App() {
       keys: (page.keys ?? []).filter((_, i) => !selectedKeyIndices.includes(i)),
     }))
     setSelectedKeyIndices([])
+  }, [mutatePageAtPath, subpagePath, selectedKeyIndices])
+
+  const clearKeys = useCallback(() => {
+    if (selectedKeyIndices.length === 0) return
+    const selSet = new Set(selectedKeyIndices)
+    mutatePageAtPath(subpagePath, (page) => ({
+      ...page,
+      keys: (page.keys ?? []).map((k, i) => (selSet.has(i) ? { ...k, label: [] } : k)),
+    }))
   }, [mutatePageAtPath, subpagePath, selectedKeyIndices])
 
   const moveKey = useCallback(
@@ -538,7 +558,7 @@ export default function App() {
       } else if (e.key === 'c' || e.key === 'C') {
         if (!e.ctrlKey) {
           e.preventDefault()
-          if (selectedKeyIndices.length === 1) updateKeyAtPath(subpagePath, selectedKeyIndices[0]!, () => ({ label: [] }))
+          clearKeys()
         }
       } else if (e.key === 'Delete') {
         e.preventDefault()
@@ -547,7 +567,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedKeyIndices, currentKeys, currentRows, isClientPage, moveKey, moveSelectedKeys, goToSubpage, updateKeyAtPath, subpagePath, removeKey, copyKeys, cutKeys, pasteKeys])
+  }, [selectedKeyIndices, currentKeys, currentRows, isClientPage, moveKey, moveSelectedKeys, goToSubpage, removeKey, clearKeys, copyKeys, cutKeys, pasteKeys])
 
   const handleSelectKey = useCallback((index: number, addToSelection: boolean, rangeSelect: boolean) => {
     if (rangeSelect && selectedKeyIndices.length > 0) {
@@ -709,6 +729,7 @@ export default function App() {
                 if (primaryKeyIndex == null) return
                 updateKeyAtPath(subpagePath, primaryKeyIndex, updater)
               }}
+              onClearKeys={clearKeys}
               onRemoveKey={removeKey}
               onGoToSubpage={primaryKeyIndex != null ? () => goToSubpage(primaryKeyIndex) : undefined}
               onRemoveSubpage={

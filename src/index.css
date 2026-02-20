@@ -17,6 +17,12 @@ body {
   flex-direction: column;
 }
 
+button, button * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+}
+
 button {
   font: inherit;
   cursor: pointer;
@@ -209,6 +215,12 @@ input::placeholder, textarea::placeholder {
   gap: 6px;
   padding: 0.5rem 0;
   align-content: start;
+}
+
+.key-cell, .key-cell * {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
 }
 
 .key-cell {
