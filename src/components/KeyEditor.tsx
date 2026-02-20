@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, type RefObject } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, type RefObject } from 'react'
 import type { DirectAccessKey } from '../types'
 import type { StationEntry } from '../lib/vacsStations'
 import {
@@ -27,6 +27,33 @@ interface KeyEditorProps {
 const SUGGESTIONS_MAX = 40
 const BLUR_DELAY_MS = 150
 
+/** Resolve effective controlled_by: own list + each parent's list appended (recursive), then stable deduplication. */
+function getResolvedControlledBy(entry: StationEntry, byId: Map<string, StationEntry>): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  function append(ids: string[]) {
+    for (const id of ids) {
+      if (!seen.has(id)) {
+        seen.add(id)
+        result.push(id)
+      }
+    }
+  }
+
+  function resolve(e: StationEntry, visited: Set<string>): void {
+    append(e.controlled_by ?? [])
+    if (e.parent_id && !visited.has(e.parent_id)) {
+      visited.add(e.parent_id)
+      const parent = byId.get(e.parent_id)
+      if (parent) resolve(parent, visited)
+    }
+  }
+
+  resolve(entry, new Set<string>())
+  return result
+}
+
 export default function KeyEditor({
   keyData,
   keyIndex,
@@ -53,6 +80,11 @@ export default function KeyEditor({
     stationIdMatchesTokens(normalizeStationIdForMatch(s.id), matchTokens)
   ).slice(0, SUGGESTIONS_MAX)
   const showSuggestions = suggestionOpen && stationId.length > 0 && suggestions.length > 0
+  const stationsById = useMemo(() => {
+    const map = new Map<string, StationEntry>()
+    for (const s of stations ?? []) map.set(s.id, s)
+    return map
+  }, [stations])
 
   const closeSuggestions = useCallback(() => {
     setSuggestionOpen(false)
@@ -225,9 +257,10 @@ export default function KeyEditor({
                   data-highlight={i === highlightIndex}
                   className={i === highlightIndex ? 'station-id-suggestion highlighted' : 'station-id-suggestion'}
                   title={
-                    entry.controlled_by?.length
-                      ? `Controlled by:\n${entry.controlled_by.join('\n')}`
-                      : undefined
+                    (() => {
+                      const resolved = getResolvedControlledBy(entry, stationsById)
+                      return resolved.length > 0 ? `Controlled by:\n${resolved.join('\n')}` : undefined
+                    })()
                   }
                   onMouseDown={(e) => {
                     e.preventDefault()

@@ -1,7 +1,7 @@
 /**
  * Load station IDs from MorpheusXAUT/vacs-data dataset on GitHub.
  * Discovers all FIRs dynamically; supports stations.toml and stations.json.
- * Extracts station `id`, `fir`, and `controlled_by` (for tooltips).
+ * Extracts station `id`, `fir`, `parent_id`, and `controlled_by` (for tooltips).
  */
 
 const API_BASE = 'https://api.github.com/repos/MorpheusXAUT/vacs-data/contents/dataset'
@@ -11,6 +11,8 @@ const REF = 'ref=main'
 export interface StationEntry {
   id: string
   fir: string
+  /** Parent station ID for coverage inheritance (for tooltips). */
+  parent_id?: string
   /** Station IDs that control this station (for tooltips). */
   controlled_by?: string[]
 }
@@ -39,15 +41,17 @@ async function getStationsFileName(fir: string): Promise<string | null> {
   return null
 }
 
-/** Parse TOML: extract id and controlled_by for each [[stations]] block. */
-function parseTomlStations(text: string): { id: string; controlled_by: string[] }[] {
-  const result: { id: string; controlled_by: string[] }[] = []
+/** Parse TOML: extract id, parent_id, and controlled_by for each [[stations]] block. */
+function parseTomlStations(text: string): { id: string; parent_id?: string; controlled_by: string[] }[] {
+  const result: { id: string; parent_id?: string; controlled_by: string[] }[] = []
   const blockRe = /\[\[stations\]\]\s*([\s\S]*?)(?=\[\[stations\]\]|$)/g
   let block: RegExpExecArray | null
   while ((block = blockRe.exec(text)) !== null) {
     const section = block[1]
     const idM = /id\s*=\s*"([^"]+)"/.exec(section)
     if (!idM) continue
+    const parentIdM = /parent_id\s*=\s*["']([^"']*)["']/.exec(section)
+    const parent_id = parentIdM?.[1] ? parentIdM[1].trim() || undefined : undefined
     const controlledBy: string[] = []
     const arrayMatch = /controlled_by\s*=\s*\[([\s\S]*?)\]/m.exec(section)
     if (arrayMatch) {
@@ -55,25 +59,26 @@ function parseTomlStations(text: string): { id: string; controlled_by: string[] 
       let q: RegExpExecArray | null
       while ((q = quotedRe.exec(arrayMatch[1])) !== null) controlledBy.push(q[1])
     }
-    result.push({ id: idM[1], controlled_by: controlledBy })
+    result.push({ id: idM[1], parent_id, controlled_by: controlledBy })
   }
   return result
 }
 
-/** Parse JSON station file: array of { id, controlled_by? } or { stations: [...] }. */
-function parseJsonStations(data: unknown): { id: string; controlled_by: string[] }[] {
-  const result: { id: string; controlled_by: string[] }[] = []
+/** Parse JSON station file: array of { id, parent_id?, controlled_by? } or { stations: [...] }. */
+function parseJsonStations(data: unknown): { id: string; parent_id?: string; controlled_by: string[] }[] {
+  const result: { id: string; parent_id?: string; controlled_by: string[] }[] = []
   let arr: unknown[] = []
   if (Array.isArray(data)) arr = data
   else if (data != null && typeof data === 'object' && Array.isArray((data as { stations?: unknown[] }).stations))
     arr = (data as { stations: unknown[] }).stations
   for (const item of arr) {
     if (item == null || typeof item !== 'object' || typeof (item as { id?: string }).id !== 'string') continue
-    const obj = item as { id: string; controlled_by?: unknown }
+    const obj = item as { id: string; parent_id?: unknown; controlled_by?: unknown }
+    const parent_id = typeof obj.parent_id === 'string' ? obj.parent_id : undefined
     const controlled_by = Array.isArray(obj.controlled_by)
       ? obj.controlled_by.filter((x): x is string => typeof x === 'string')
       : []
-    result.push({ id: obj.id, controlled_by })
+    result.push({ id: obj.id, parent_id, controlled_by })
   }
   return result
 }
@@ -90,7 +95,12 @@ async function loadStationsForFir(fir: string): Promise<StationEntry[]> {
   const text = await res.text()
   const isJson = fileName.endsWith('.json')
   const entries = isJson ? parseJsonStations(JSON.parse(text)) : parseTomlStations(text)
-  return entries.map((e) => ({ id: e.id, fir, controlled_by: e.controlled_by?.length ? e.controlled_by : undefined }))
+  return entries.map((e) => ({
+    id: e.id,
+    fir,
+    parent_id: e.parent_id,
+    controlled_by: e.controlled_by?.length ? e.controlled_by : undefined,
+  }))
 }
 
 let cached: Promise<StationEntry[]> | null = null
