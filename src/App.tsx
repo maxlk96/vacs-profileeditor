@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import type { TabbedProfile, DirectAccessKey, DirectAccessPage } from './types'
 import { createDefaultProfile } from './types'
 import { validateProfile, normalizeProfile } from './lib/validation'
+import { serializeProfile } from './lib/serializeProfile'
 import { useProfileHistory } from './hooks/useProfileHistory'
 import { loadStations } from './lib/vacsStations'
 import Header from './components/Header'
@@ -465,7 +466,7 @@ export default function App() {
 
   const downloadProfile = useCallback(
     (filename: string) => {
-      const json = JSON.stringify(profile, null, 2)
+      const json = serializeProfile(profile)
       const blob = new Blob([json], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
