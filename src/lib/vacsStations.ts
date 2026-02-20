@@ -8,6 +8,15 @@ const API_BASE = 'https://api.github.com/repos/MorpheusXAUT/vacs-data/contents/d
 const RAW_BASE = 'https://raw.githubusercontent.com/MorpheusXAUT/vacs-data/main/dataset'
 const REF = 'ref=main'
 
+/** Optional token for higher GitHub API rate limits (5k/hr vs 60/hr). Set VITE_GITHUB_TOKEN in .env.local */
+const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined
+
+function apiHeaders(): HeadersInit {
+  const h: HeadersInit = { Accept: 'application/vnd.github.v3+json' }
+  if (GITHUB_TOKEN) (h as Record<string, string>)['Authorization'] = `Bearer ${GITHUB_TOKEN}`
+  return h
+}
+
 export interface StationEntry {
   id: string
   fir: string
@@ -19,7 +28,7 @@ export interface StationEntry {
 
 /** List FIR names by listing the dataset directory (only type === "dir"). */
 async function discoverFirs(): Promise<string[]> {
-  const res = await fetch(`${API_BASE}?${REF}`)
+  const res = await fetch(`${API_BASE}?${REF}`, { headers: apiHeaders() })
   if (!res.ok) throw new Error(`Failed to list dataset: ${res.status} ${res.statusText}`)
   const data = await res.json()
   if (!Array.isArray(data)) return []
@@ -31,7 +40,7 @@ async function discoverFirs(): Promise<string[]> {
 
 /** List files in a FIR directory; return 'stations.toml' or 'stations.json' if present (toml preferred). */
 async function getStationsFileName(fir: string): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/${encodeURIComponent(fir)}?${REF}`)
+  const res = await fetch(`${API_BASE}/${encodeURIComponent(fir)}?${REF}`, { headers: apiHeaders() })
   if (!res.ok) return null
   const data = await res.json()
   if (!Array.isArray(data)) return null
