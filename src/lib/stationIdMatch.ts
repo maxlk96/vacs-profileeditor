@@ -23,17 +23,10 @@ export function stationIdMatchesTokens(normalizedId: string, tokens: string[]): 
   return tokens.length > 0 && tokens.every((t) => normalizedId.includes(t))
 }
 
-/** True when key has a station_id that is not in the loaded dataset (mismatch). Uses same flexible matching as editor. */
+/** True when key has a station_id that is not in the loaded dataset (mismatch). Only exact match (as in dataset) counts as valid. */
 export function hasStationIdMismatch(stationId: string | undefined, stations: StationEntry[] | null): boolean {
   const sid = stationId?.trim() ?? ''
   if (sid === '') return false
   if (stations == null || stations.length === 0) return false
-  const normalizedInput = normalizeStationIdForMatch(sid)
-  const exactMatch = stations.some((s) => s.id === stationId)
-  const normalizedMatch = stations.some((s) => normalizeStationIdForMatch(s.id) === normalizedInput)
-  const matchTokens = getMatchTokens(sid)
-  const tokenMatch =
-    matchTokens.length > 0 &&
-    stations.some((s) => stationIdMatchesTokens(normalizeStationIdForMatch(s.id), matchTokens))
-  return !exactMatch && !normalizedMatch && !tokenMatch
+  return !stations.some((s) => s.id === stationId)
 }

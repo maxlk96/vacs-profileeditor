@@ -98,15 +98,9 @@ export default function KeyEditor({
     onUpdateKey((k) => ({ ...k, label: next.slice(0, 3) }))
   }
 
-  const normalizedInput = normalizeStationIdForMatch(stationId)
   const hasStations = stations != null && stations.length > 0
   const exactMatch = hasStations && stations.some((s) => s.id === stationId)
-  const normalizedMatch = hasStations && stations.some((s) => normalizeStationIdForMatch(s.id) === normalizedInput)
-  const tokenMatch =
-    hasStations &&
-    matchTokens.length > 0 &&
-    stations.some((s) => stationIdMatchesTokens(normalizeStationIdForMatch(s.id), matchTokens))
-  const stationExists = stationId === '' || exactMatch || normalizedMatch || tokenMatch
+  const stationExists = stationId === '' || exactMatch
 
   const onStationIdFocus = () => {
     if (blurTimeoutRef.current != null) {
