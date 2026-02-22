@@ -296,7 +296,15 @@ export default function App() {
     const selSet = new Set(selectedKeyIndices)
     mutatePageAtPath(subpagePath, (page) => ({
       ...page,
-      keys: (page.keys ?? []).map((k, i) => (selSet.has(i) ? { ...k, label: [] } : k)),
+      keys: (page.keys ?? []).map((k, i) =>
+        selSet.has(i)
+          ? {
+              ...k,
+              label: [],
+              station_id: undefined,
+            }
+          : k
+      ),
     }))
   }, [mutatePageAtPath, subpagePath, selectedKeyIndices])
 
