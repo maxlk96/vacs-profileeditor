@@ -70,6 +70,11 @@ function SortableKeyCell({
   const line2 = (lines[2] ?? '').trim()
   const isEmpty = lines.length === 0 || (line0 === '' && line1 === '' && line2 === '')
   const hasNoStation = !keyData.station_id || keyData.station_id.trim() === ''
+  const labelHasText = !isEmpty
+  const hasStationId = !hasNoStation
+  const showStationOnly = hasStationId && !labelHasText
+  const showLabelOnly = !hasStationId && labelHasText
+  const showMismatch = labelHasText && hasStationMismatch
   const hasSubpage = keyData.page != null
 
   return (
@@ -82,7 +87,7 @@ function SortableKeyCell({
       {...attributes}
       {...listeners}
     >
-      {hasStationMismatch && (
+      {showMismatch && (
         <span className="key-cell-mismatch-indicator" title="Station ID not found in VACS dataset" aria-hidden>
           <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
             <path d="M8 1L15 14H1L8 1zm0 5v3h1V6H8zm0 4v1h1v-1H8z" />
@@ -98,11 +103,29 @@ function SortableKeyCell({
           {line2 && <span className="key-cell-line">{line2}</span>}
         </>
       )}
-      {hasSubpage && (
-        <span className="key-cell-subpage-indicator" title="Has subpage">
-          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M6 4l4 4-4 4" />
-          </svg>
+      {(showStationOnly || showLabelOnly || hasSubpage) && (
+        <span className="key-cell-corner-indicators">
+          {showStationOnly && (
+            <span className="key-cell-meta-indicator" title="Station ID entered without label text present" aria-hidden>
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                <path d="M8 1L15 14H1L8 1zm0 5v3h1V6H8zm0 4v1h1v-1H8z" />
+              </svg>
+            </span>
+          )}
+          {showLabelOnly && (
+            <span className="key-cell-meta-indicator" title="Station ID missing" aria-hidden>
+              <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                <path d="M8 1L15 14H1L8 1zm0 5v3h1V6H8zm0 4v1h1v-1H8z" />
+              </svg>
+            </span>
+          )}
+          {hasSubpage && (
+            <span className="key-cell-subpage-indicator" title="Has subpage" aria-hidden>
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 4l4 4-4 4" />
+              </svg>
+            </span>
+          )}
         </span>
       )}
     </div>

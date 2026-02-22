@@ -124,6 +124,7 @@ export default function KeyEditor({
   const line0 = label[0] ?? ''
   const line1 = label[1] ?? ''
   const line2 = label[2] ?? ''
+  const labelHasText = [line0, line1, line2].some((line) => line.trim() !== '')
 
   const setLabelLine = (index: number, value: string) => {
     const next = [...label]
@@ -276,7 +277,7 @@ export default function KeyEditor({
             </ul>
           )}
         </div>
-        {stationId.length > 0 && stations != null && stations.length > 0 && !stationExists && (
+        {labelHasText && stationId.length > 0 && stations != null && stations.length > 0 && !stationExists && (
           <p className="station-id-unknown" role="status">
             Station ID not found in VACS dataset
           </p>
