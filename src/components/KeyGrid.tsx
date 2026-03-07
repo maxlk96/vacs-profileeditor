@@ -33,6 +33,7 @@ interface KeyGridProps {
   onBackToPath: (path: SubpagePath) => void
   isClientPage?: boolean
   stations?: StationEntry[] | null
+  tabBarSlot?: React.ReactNode
 }
 
 function SortableKeyCell({
@@ -150,6 +151,7 @@ export default function KeyGrid({
   onBackToPath,
   isClientPage = false,
   stations = null,
+  tabBarSlot,
 }: KeyGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -164,7 +166,7 @@ export default function KeyGrid({
     if (from >= 0 && to >= 0) onReorderKeys(from, to)
   }
 
-  const cols = rows > 0 ? Math.ceil(keys.length / rows) || 1 : 1
+  const cols = rows > 0 ? Math.max(Math.ceil(keys.length / rows) || 1, 8) : 8
 
   return (
     <div>
@@ -192,8 +194,8 @@ export default function KeyGrid({
       <div
         className="key-grid"
         style={{
-          gridTemplateColumns: `repeat(${cols}, minmax(80px, 1fr))`,
-          gridTemplateRows: `repeat(${rows}, auto)`,
+          gridTemplateColumns: `repeat(${cols}, 106px)`,
+          gridTemplateRows: `repeat(${rows}, 1fr)`,
           gridAutoFlow: 'column',
         }}
       >
@@ -213,6 +215,7 @@ export default function KeyGrid({
           </SortableContext>
         </DndContext>
       </div>
+      <div className="key-grid-bottom-row">
       <div className="key-actions">
         <button type="button" onClick={onAddKey} disabled={isClientPage} className="key-action-btn" title="Add key" aria-label="Add key">
           <IconPlus />
@@ -258,6 +261,8 @@ export default function KeyGrid({
             </button>
           </>
         )}
+      </div>
+      {tabBarSlot}
       </div>
     </div>
   )
