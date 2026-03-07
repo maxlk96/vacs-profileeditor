@@ -645,15 +645,6 @@ export default function App() {
           </div>
         </div>
       )}
-      <TabBar
-        tabs={profile.tabs}
-        selectedIndex={selectedTabIndex}
-        onSelectTab={setSelectedTabIndex}
-        onReorderTabs={reorderTabs}
-        onAddTab={addTab}
-        onDuplicateTab={duplicateTab}
-        onRemoveTab={removeTab}
-      />
       <main className="main-content">
         <section className="tab-editor">
           <h3>Tab</h3>
@@ -713,6 +704,17 @@ export default function App() {
             onBackToPath={goBackToPath}
             isClientPage={isClientPage}
             stations={stations}
+            tabBarSlot={
+              <TabBar
+                tabs={profile.tabs}
+                selectedIndex={selectedTabIndex}
+                onSelectTab={setSelectedTabIndex}
+                onReorderTabs={reorderTabs}
+                onAddTab={addTab}
+                onDuplicateTab={duplicateTab}
+                onRemoveTab={removeTab}
+              />
+            }
           />
         </section>
         <aside className="main-sidebar">

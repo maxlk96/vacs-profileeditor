@@ -64,6 +64,7 @@ input::placeholder, textarea::placeholder {
   width: 100%;
   padding: 1rem;
   gap: 1rem;
+  overflow: hidden;
 }
 
 .app-header {
@@ -89,29 +90,47 @@ input::placeholder, textarea::placeholder {
 
 .tab-bar {
   display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  min-height: 40px;
+  background: #6b7b8d;
+}
+
+.tab-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.tab-bar-tabs {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.25rem 0;
-  min-height: 40px;
+  max-width: calc(4 * 90px + 3 * 0.25rem);
 }
 
 .tab {
   padding: 0.4rem 0.75rem;
   border-radius: 4px;
-  border: 1px solid #475569;
-  background: #334155;
-  color: #e2e8f0;
+  border: 1px solid #a0aab4;
+  background: #c8d0d8;
+  color: #1a1a2e;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .tab:hover {
-  background: #475569;
+  background: #dde3e8;
 }
 
 .tab.selected {
-  background: #3b82f6;
-  border-color: #2563eb;
+  background: #90caf9;
+  border-color: #42a5f5;
+  color: #0d1b2a;
 }
 
 .tab.dragging {
@@ -125,16 +144,18 @@ input::placeholder, textarea::placeholder {
   width: 28px;
   height: 28px;
   padding: 0;
-  margin-left: 0.25rem;
-  color: #94a3b8;
+  color: #c8d0d8;
+  border-color: #8a949e;
+  background: transparent;
 }
 
 .tab-bar-btn:hover {
-  color: #e2e8f0;
+  color: #ffffff;
+  background: #8a949e;
 }
 
 .tab-bar-btn:first-of-type {
-  margin-left: 0.5rem;
+  margin-left: 0;
 }
 
 .main-content {
@@ -200,21 +221,28 @@ input::placeholder, textarea::placeholder {
 }
 
 .grid-area {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  padding: 1rem;
-  background: #0f172a;
+  min-width: 0;
+  padding: 0;
+  background: #6b7b8d;
   border-radius: 8px;
   border: 1px solid #334155;
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.grid-area .tab-bar {
+  margin-top: 0;
 }
 
 .key-grid {
   display: grid;
-  gap: 6px;
-  padding: 0.5rem 0;
-  align-content: start;
+  gap: 4px;
+  padding: 8px;
+  background: #b0bec5;
+  height: 480px;
+  overflow: hidden;
 }
 
 .key-cell, .key-cell * {
@@ -224,28 +252,33 @@ input::placeholder, textarea::placeholder {
 }
 
 .key-cell {
-  min-height: 56px;
-  padding: 0.35rem 0.5rem;
+  min-height: 0;
+  padding: 0.25rem 0.4rem;
   border-radius: 4px;
-  border: 2px solid #475569;
-  background: #334155;
-  color: #e2e8f0;
+  border: 1px solid #8a9aa8;
+  background: #c8cfd6;
+  color: #1a1a2e;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 500;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  line-height: 1.3;
+  align-items: center;
+  text-align: center;
+  line-height: 1.25;
+  box-shadow: 1px 1px 3px rgba(0,0,0,0.25);
+  overflow: hidden;
 }
 
 .key-cell:hover {
   border-color: #64748b;
-  background: #475569;
+  background: #d8dfe6;
 }
 
 .key-cell.selected {
-  border-color: #64748b;
-  background: #475569;
+  border-color: #42a5f5;
+  background: #90caf9;
 }
 
 .key-cell.dragging {
@@ -254,16 +287,27 @@ input::placeholder, textarea::placeholder {
 
 .key-cell.over {
   border-color: #22c55e;
-  background: #14532d;
+  background: #c8e6c9;
 }
 
 .key-cell-empty {
-  color: #64748b;
+  color: #8a9aa8;
   font-style: italic;
+  background: #b0bcc6;
+  border-color: #7a8a98;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.15);
 }
 
 .key-cell-no-station {
-  color: #64748b;
+  color: #78909c;
+}
+
+.key-grid-bottom-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
 .key-actions {
@@ -271,7 +315,6 @@ input::placeholder, textarea::placeholder {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
-  margin-top: 0.5rem;
 }
 
 .key-action-btn {
@@ -431,9 +474,9 @@ input::placeholder, textarea::placeholder {
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background: #0f172a;
-  border: 1px solid #475569;
-  color: #94a3b8;
+  background: #fff3e0;
+  border: 1px solid #e0a040;
+  color: #e65100;
   font-size: 0.55rem;
   font-weight: 600;
   line-height: 1;
@@ -449,7 +492,7 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: #546e7a;
   opacity: 0.9;
 }
 
@@ -460,7 +503,7 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fbbf24;
+  color: #e65100;
   opacity: 0.95;
   pointer-events: none;
 }
