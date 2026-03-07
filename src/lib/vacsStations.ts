@@ -2,11 +2,13 @@
  * Load station IDs from MorpheusXAUT/vacs-data dataset on GitHub.
  * Discovers all FIRs dynamically; supports stations.toml and stations.json.
  * Extracts station `id`, `fir`, `parent_id`, and `controlled_by` (for tooltips).
+ *
+ * Uses a single GitHub API call (recursive tree) to discover all station files,
+ * then fetches raw content from raw.githubusercontent.com (not rate-limited).
  */
 
-const API_BASE = 'https://api.github.com/repos/MorpheusXAUT/vacs-data/contents/dataset'
+const TREE_API = 'https://api.github.com/repos/MorpheusXAUT/vacs-data/git/trees/main?recursive=1'
 const RAW_BASE = 'https://raw.githubusercontent.com/MorpheusXAUT/vacs-data/main/dataset'
-const REF = 'ref=main'
 
 /** Optional token for higher GitHub API rate limits (5k/hr vs 60/hr). Set VITE_GITHUB_TOKEN in .env.local */
 const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined
@@ -26,28 +28,40 @@ export interface StationEntry {
   controlled_by?: string[]
 }
 
-/** List FIR names by listing the dataset directory (only type === "dir"). */
-async function discoverFirs(): Promise<string[]> {
-  const res = await fetch(`${API_BASE}?${REF}`, { headers: apiHeaders() })
-  if (!res.ok) throw new Error(`Failed to list dataset: ${res.status} ${res.statusText}`)
-  const data = await res.json()
-  if (!Array.isArray(data)) return []
-  return data
-    .filter((item: { type?: string }) => item.type === 'dir')
-    .map((item: { name: string }) => item.name)
-    .filter((name: string) => name.length > 0)
+interface StationFileRef {
+  fir: string
+  fileName: string
 }
 
-/** List files in a FIR directory; return 'stations.toml' or 'stations.json' if present (toml preferred). */
-async function getStationsFileName(fir: string): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/${encodeURIComponent(fir)}?${REF}`, { headers: apiHeaders() })
-  if (!res.ok) return null
+/**
+ * Discover all station files in a single API call using the Git Trees API (recursive).
+ * Returns a list of { fir, fileName } for each dataset/{fir}/stations.toml or stations.json found.
+ * When both toml and json exist for the same FIR, toml is preferred.
+ */
+async function discoverStationFiles(): Promise<StationFileRef[]> {
+  const res = await fetch(TREE_API, { headers: apiHeaders() })
+  if (!res.ok) throw new Error(`Failed to fetch repo tree: ${res.status} ${res.statusText}`)
   const data = await res.json()
-  if (!Array.isArray(data)) return null
-  const names = data.map((item: { name: string }) => item.name)
-  if (names.includes('stations.toml')) return 'stations.toml'
-  if (names.includes('stations.json')) return 'stations.json'
-  return null
+  const tree: { path: string; type: string }[] = data.tree ?? []
+
+  // Match paths like "dataset/{FIR}/stations.toml" or "dataset/{FIR}/stations.json"
+  const stationFileRe = /^dataset\/([^/]+)\/(stations\.(?:toml|json))$/
+  const byFir = new Map<string, StationFileRef>()
+
+  for (const entry of tree) {
+    if (entry.type !== 'blob') continue
+    const m = stationFileRe.exec(entry.path)
+    if (!m) continue
+    const fir = m[1]
+    const fileName = m[2]
+    const existing = byFir.get(fir)
+    // Prefer toml over json
+    if (!existing || (existing.fileName.endsWith('.json') && fileName.endsWith('.toml'))) {
+      byFir.set(fir, { fir, fileName })
+    }
+  }
+
+  return Array.from(byFir.values())
 }
 
 /** Parse TOML: extract id, parent_id, and controlled_by for each [[stations]] block. */
@@ -92,43 +106,41 @@ function parseJsonStations(data: unknown): { id: string; parent_id?: string; con
   return result
 }
 
-/** Load stations for one FIR: fetch only the stations file that exists (toml or json). */
-async function loadStationsForFir(fir: string): Promise<StationEntry[]> {
-  const fileName = await getStationsFileName(fir)
-  if (fileName == null) return []
-
-  const url = `${RAW_BASE}/${encodeURIComponent(fir)}/${fileName}`
+/** Fetch and parse stations for one FIR given the already-known file name (no API call). */
+async function fetchStationsForFir(ref: StationFileRef): Promise<StationEntry[]> {
+  const url = `${RAW_BASE}/${encodeURIComponent(ref.fir)}/${ref.fileName}`
   const res = await fetch(url)
   if (!res.ok) return []
 
   const text = await res.text()
-  const isJson = fileName.endsWith('.json')
+  const isJson = ref.fileName.endsWith('.json')
   const entries = isJson ? parseJsonStations(JSON.parse(text)) : parseTomlStations(text)
   return entries.map((e) => ({
     id: e.id,
-    fir,
+    fir: ref.fir,
     parent_id: e.parent_id,
     controlled_by: e.controlled_by?.length ? e.controlled_by : undefined,
   }))
 }
 
-let cached: Promise<StationEntry[]> | null = null
+let inflight: Promise<StationEntry[]> | null = null
 
 /**
- * Load all stations from the vacs-data dataset: discover FIRs, then for each
- * load stations.toml or stations.json and extract only station id.
+ * Load all stations from the vacs-data dataset.
+ * Makes exactly ONE GitHub API call (recursive tree) to discover all station files,
+ * then fetches raw content files from raw.githubusercontent.com (not rate-limited).
  * Result is deduplicated by id (first FIR wins), sorted by id.
- * Repeated calls return the same promise until load completes (no in-memory cache after).
+ * Concurrent calls share the same in-flight promise; result is NOT cached after completion.
  */
 export function loadStations(): Promise<StationEntry[]> {
-  if (cached != null) return cached
+  if (inflight != null) return inflight
   const p = (async (): Promise<StationEntry[]> => {
-    const firs = await discoverFirs()
+    const stationFiles = await discoverStationFiles()
     const byId = new Map<string, StationEntry>()
     await Promise.all(
-      firs.map(async (fir) => {
+      stationFiles.map(async (ref) => {
         try {
-          const entries = await loadStationsForFir(fir)
+          const entries = await fetchStationsForFir(ref)
           for (const e of entries) if (!byId.has(e.id)) byId.set(e.id, e)
         } catch {
           // skip this FIR
@@ -138,7 +150,7 @@ export function loadStations(): Promise<StationEntry[]> {
     const list = Array.from(byId.values()).sort((a, b) => a.id.localeCompare(b.id))
     return list
   })()
-  cached = p
-  p.finally(() => { cached = null })
+  inflight = p
+  p.finally(() => { inflight = null })
   return p
 }
