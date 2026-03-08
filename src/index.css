@@ -106,11 +106,10 @@ input::placeholder, textarea::placeholder {
 }
 
 .tab-bar-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, auto);
   align-items: center;
   gap: 0.25rem;
-  max-width: calc(4 * 90px + 3 * 0.25rem);
 }
 
 .tab {
