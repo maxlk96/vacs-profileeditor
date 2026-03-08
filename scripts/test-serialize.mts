@@ -5,7 +5,7 @@
  */
 
 const BASE =
-  "https://raw.githubusercontent.com/MorpheusXAUT/vacs-data/main/dataset"
+  "https://raw.githubusercontent.com/vacs-project/vacs-data/main/dataset"
 
 const PROFILES = [
   "EDGG/profiles/EDGG_EBG1.json",

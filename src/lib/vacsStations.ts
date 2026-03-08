@@ -1,5 +1,5 @@
 /**
- * Load station IDs from MorpheusXAUT/vacs-data dataset on GitHub.
+ * Load station IDs from vacs-project/vacs-data dataset on GitHub.
  * Discovers all FIRs dynamically; supports stations.toml and stations.json.
  * Extracts station `id`, `fir`, `parent_id`, and `controlled_by` (for tooltips).
  *
@@ -7,8 +7,8 @@
  * then fetches raw content from raw.githubusercontent.com (not rate-limited).
  */
 
-const TREE_API = 'https://api.github.com/repos/MorpheusXAUT/vacs-data/git/trees/main?recursive=1'
-const RAW_BASE = 'https://raw.githubusercontent.com/MorpheusXAUT/vacs-data/main/dataset'
+const TREE_API = 'https://api.github.com/repos/vacs-project/vacs-data/git/trees/main?recursive=1'
+const RAW_BASE = 'https://raw.githubusercontent.com/vacs-project/vacs-data/main/dataset'
 
 /** Optional token for higher GitHub API rate limits (5k/hr vs 60/hr). Set VITE_GITHUB_TOKEN in .env.local */
 const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined

@@ -42,7 +42,7 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173. Use **Load JSON** to open a profile (e.g. from [vacs-data](https://github.com/MorpheusXAUT/vacs-data/tree/main/dataset/LO/profiles)), edit, and **Save JSON** to download.
+Then open http://localhost:5173. Use **Load JSON** to open a profile (e.g. from [vacs-data](https://github.com/vacs-project/vacs-data/tree/main/dataset/LO/profiles)), edit, and **Save JSON** to download.
 
 ## Build
 
@@ -54,4 +54,4 @@ Output is in `dist/`.
 
 ## Profile format
 
-Only **Tabbed** profiles are supported. See [Profile Configuration (vacs-data)](https://github.com/MorpheusXAUT/vacs-data/blob/main/docs/dataset/profiles.md).
+Only **Tabbed** profiles are supported. See [Profile Configuration (vacs-data)](https://github.com/vacs-project/vacs-data/blob/main/docs/dataset/profiles.md).
