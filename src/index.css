@@ -222,17 +222,35 @@ input::placeholder, textarea::placeholder {
 .grid-area {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-width: 0;
   padding: 0;
   background: #6b7b8d;
   border-radius: 8px;
   border: 1px solid #334155;
   overflow: hidden;
-  align-self: flex-start;
 }
 
 .grid-area .tab-bar {
   margin-top: 0;
+}
+
+.key-grid-container {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.key-grid-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+}
+
+.key-grid-inner {
+  width: max-content;
+  min-width: 100%;
 }
 
 .key-grid {
@@ -242,6 +260,7 @@ input::placeholder, textarea::placeholder {
   background: #b0bec5;
   height: 480px;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .key-cell, .key-cell * {

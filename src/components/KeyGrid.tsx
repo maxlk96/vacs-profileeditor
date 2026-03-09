@@ -169,7 +169,7 @@ export default function KeyGrid({
   const cols = rows > 0 ? Math.max(Math.ceil(keys.length / rows) || 1, 8) : 8
 
   return (
-    <div>
+    <div className="key-grid-container">
       {breadcrumbItems.length > 1 && (
         <nav className="breadcrumb" aria-label="Breadcrumb">
           {breadcrumbItems.map((item, i) => (
@@ -191,6 +191,8 @@ export default function KeyGrid({
           <span className="client-page-badge">Client page (read-only)</span>
         </p>
       )}
+      <div className="key-grid-scroll-wrap">
+        <div className="key-grid-inner">
       <div
         className="key-grid"
         style={{
@@ -214,6 +216,8 @@ export default function KeyGrid({
             ))}
           </SortableContext>
         </DndContext>
+      </div>
+        </div>
       </div>
       <div className="key-grid-bottom-row">
       <div className="key-actions">
