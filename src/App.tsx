@@ -301,6 +301,7 @@ export default function App() {
           ? {
               ...k,
               label: [],
+              color: undefined,
               station_id: undefined,
             }
           : k

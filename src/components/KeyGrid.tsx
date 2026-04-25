@@ -77,11 +77,12 @@ function SortableKeyCell({
   const showLabelOnly = !hasStationId && labelHasText
   const showMismatch = labelHasText && hasStationMismatch
   const hasSubpage = keyData.page != null
+  const colorClass = keyData.color != null ? `key-cell-color-${keyData.color}` : ''
 
   return (
     <div
       ref={setNodeRef}
-      className={`key-cell ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isEmpty ? 'key-cell-empty' : ''} ${hasNoStation ? 'key-cell-no-station' : ''} ${hasSubpage ? 'key-cell-has-subpage' : ''} ${hasStationMismatch ? 'key-cell-station-mismatch' : ''}`}
+      className={`key-cell ${colorClass} ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isEmpty ? 'key-cell-empty' : ''} ${hasNoStation ? 'key-cell-no-station' : ''} ${hasSubpage ? 'key-cell-has-subpage' : ''} ${hasStationMismatch ? 'key-cell-station-mismatch' : ''}`}
       style={style}
       onClick={onSelect}
       onDoubleClick={onDoubleClick}

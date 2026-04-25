@@ -46,6 +46,7 @@ function pageToJson(page: DirectAccessPage): Record<string, unknown> {
 
 function keyToJson(key: DirectAccessKey): Record<string, unknown> {
   const result: Record<string, unknown> = { label: key.label }
+  if (key.color != null) result.color = key.color
   if (key.station_id != null && key.station_id !== '') result.station_id = key.station_id
   if (key.page != null) result.page = pageToJson(key.page)
   return result

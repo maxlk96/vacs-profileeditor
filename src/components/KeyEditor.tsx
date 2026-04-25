@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type RefObject } from 'react'
-import type { DirectAccessKey } from '../types'
+import { CUSTOM_BUTTON_COLORS, CUSTOM_BUTTON_COLOR_HEX, type DirectAccessKey } from '../types'
 import type { StationEntry } from '../lib/vacsStations'
 import {
   normalizeStationIdForMatch,
@@ -121,6 +121,8 @@ export default function KeyEditor({
   }
 
   const label = keyData.label ?? []
+  const selectedColor = keyData.color
+  const selectedColorHex = selectedColor != null ? CUSTOM_BUTTON_COLOR_HEX[selectedColor] : undefined
   const line0 = label[0] ?? ''
   const line1 = label[1] ?? ''
   const line2 = label[2] ?? ''
@@ -212,6 +214,43 @@ export default function KeyEditor({
           onChange={(e) => setLabelLine(2, e.target.value)}
           placeholder="Third line (optional)"
         />
+      </label>
+      <label>
+        Button color
+        <select
+          value={keyData.color ?? ''}
+          style={
+            selectedColorHex != null
+              ? {
+                  background: selectedColorHex,
+                  color: '#1a1a2e',
+                  borderColor: '#64748b',
+                }
+              : undefined
+          }
+          onChange={(e) =>
+            onUpdateKey((k) => ({
+              ...k,
+              color: e.target.value === '' ? undefined : (e.target.value as DirectAccessKey['color']),
+            }))
+          }
+        >
+          <option value="" style={{ background: '#0f172a', color: '#e2e8f0' }}>
+            Default
+          </option>
+          {CUSTOM_BUTTON_COLORS.map((color) => (
+            <option
+              key={color}
+              value={color}
+              style={{
+                background: CUSTOM_BUTTON_COLOR_HEX[color],
+                color: '#1a1a2e',
+              }}
+            >
+              {`■ ${color}`}
+            </option>
+          ))}
+        </select>
       </label>
       <div className="station-id-field">
         <label className="station-id-label">

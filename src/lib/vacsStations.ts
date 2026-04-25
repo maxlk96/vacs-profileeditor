@@ -39,7 +39,12 @@ interface StationFileRef {
  * When both toml and json exist for the same FIR, toml is preferred.
  */
 async function discoverStationFiles(): Promise<StationFileRef[]> {
-  const res = await fetch(TREE_API, { headers: apiHeaders() })
+  let res = await fetch(TREE_API, { headers: apiHeaders() })
+  // If a configured token is invalid/expired, GitHub returns 401.
+  // Retry once without Authorization so the app can still use anonymous limits.
+  if (res.status === 401 && GITHUB_TOKEN) {
+    res = await fetch(TREE_API, { headers: { Accept: 'application/vnd.github.v3+json' } })
+  }
   if (!res.ok) throw new Error(`Failed to fetch repo tree: ${res.status} ${res.statusText}`)
   const data = await res.json()
   const tree: { path: string; type: string }[] = data.tree ?? []

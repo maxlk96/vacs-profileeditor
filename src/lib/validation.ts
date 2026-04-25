@@ -1,4 +1,10 @@
-import type { TabbedProfile, Tab, DirectAccessKey, DirectAccessPage } from '../types';
+import {
+  CUSTOM_BUTTON_COLORS,
+  type TabbedProfile,
+  type Tab,
+  type DirectAccessKey,
+  type DirectAccessPage,
+} from '../types';
 
 export interface ValidationError {
   path: string;
@@ -97,6 +103,7 @@ export function normalizeProfile(profile: TabbedProfile): TabbedProfile {
           rows: Math.max(1, Math.floor(page?.rows ?? 4)),
           keys: (page?.keys ?? []).map((k): DirectAccessKey => ({
             label: Array.isArray(k.label) ? k.label.slice(0, 3).map((l) => String(l)) : [],
+            ...(isCustomButtonColor(k.color) ? { color: k.color } : {}),
             ...(k.station_id != null && k.station_id !== '' ? { station_id: String(k.station_id) } : {}),
             ...(k.page != null ? { page: normalizePage(k.page) } : {}),
           })),
@@ -111,8 +118,13 @@ function normalizePage(page: { rows?: number; keys?: DirectAccessKey[]; client_p
     rows: Math.max(1, Math.floor(page.rows ?? 4)),
     keys: (page.keys ?? []).map((k): DirectAccessKey => ({
       label: Array.isArray(k.label) ? k.label.slice(0, 3).map((l) => String(l)) : [],
+      ...(isCustomButtonColor(k.color) ? { color: k.color } : {}),
       ...(k.station_id != null && k.station_id !== '' ? { station_id: String(k.station_id) } : {}),
       ...(k.page != null ? { page: normalizePage(k.page) } : {}),
     })),
   };
+}
+
+function isCustomButtonColor(value: unknown): value is DirectAccessKey['color'] {
+  return typeof value === 'string' && (CUSTOM_BUTTON_COLORS as readonly string[]).includes(value);
 }
