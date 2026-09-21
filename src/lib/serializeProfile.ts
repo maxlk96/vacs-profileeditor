@@ -2,7 +2,7 @@ import prettier from 'prettier/standalone'
 import prettierPluginBabel from 'prettier/plugins/babel'
 import prettierPluginEstree from 'prettier/plugins/estree'
 import type { Options as PrettierOptions } from 'prettier'
-import type { TabbedProfile, DirectAccessKey, DirectAccessPage } from '../types'
+import { DEFAULT_VIEW_MODE, type TabbedProfile, type DirectAccessKey, type DirectAccessPage } from '../types'
 
 /**
  * Serialize a profile to JSON matching vacs-data Prettier format exactly.
@@ -28,11 +28,15 @@ export async function serializeProfile(profile: TabbedProfile): Promise<string> 
 }
 
 function profileToJson(profile: TabbedProfile): Record<string, unknown> {
-  return {
+  const result: Record<string, unknown> = {
     id: profile.id,
     type: profile.type,
-    tabs: profile.tabs.map(tabToJson),
   }
+  if (profile.view != null && profile.view !== DEFAULT_VIEW_MODE) {
+    result.view = profile.view
+  }
+  result.tabs = profile.tabs.map(tabToJson)
+  return result
 }
 
 function tabToJson(tab: { label: string[]; page: DirectAccessPage }): Record<string, unknown> {

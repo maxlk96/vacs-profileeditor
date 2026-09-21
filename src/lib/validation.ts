@@ -1,9 +1,12 @@
 import {
   CUSTOM_BUTTON_COLORS,
+  DEFAULT_VIEW_MODE,
+  isViewMode,
   type TabbedProfile,
   type Tab,
   type DirectAccessKey,
   type DirectAccessPage,
+  type ViewMode,
 } from '../types';
 
 export interface ValidationError {
@@ -26,6 +29,13 @@ export function validateProfile(data: unknown): { ok: true; profile: TabbedProfi
 
   if (typeof obj.id !== 'string' || obj.id.trim() === '') {
     errors.push({ path: 'id', message: 'Profile id must be a non-empty string' });
+  }
+
+  if (obj.view != null && !isViewMode(obj.view)) {
+    errors.push({
+      path: 'view',
+      message: 'View must be "page", "split", or "cycle"',
+    });
   }
 
   if (!Array.isArray(obj.tabs) || obj.tabs.length === 0) {
@@ -85,9 +95,11 @@ export function validateKeyLabel(label: unknown): string | null {
 }
 
 export function normalizeProfile(profile: TabbedProfile): TabbedProfile {
+  const view = normalizeView(profile.view);
   return {
     id: profile.id.trim(),
     type: 'Tabbed',
+    ...(view != null ? { view } : {}),
     tabs: profile.tabs.map((tab): Tab => {
       const page = tab.page as { rows?: number; keys?: DirectAccessKey[]; client_page?: unknown } | undefined
       // Handle legacy string label or new string[] label
@@ -127,4 +139,10 @@ function normalizePage(page: { rows?: number; keys?: DirectAccessKey[]; client_p
 
 function isCustomButtonColor(value: unknown): value is DirectAccessKey['color'] {
   return typeof value === 'string' && (CUSTOM_BUTTON_COLORS as readonly string[]).includes(value);
+}
+
+/** Keep only non-default view modes so omitted `view` stays the `"page"` default. */
+function normalizeView(value: unknown): ViewMode | undefined {
+  if (!isViewMode(value) || value === DEFAULT_VIEW_MODE) return undefined;
+  return value;
 }

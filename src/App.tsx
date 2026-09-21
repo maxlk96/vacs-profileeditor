@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import type { TabbedProfile, DirectAccessKey, DirectAccessPage } from './types'
-import { createDefaultProfile } from './types'
+import type { TabbedProfile, DirectAccessKey, DirectAccessPage, ViewMode } from './types'
+import { createDefaultProfile, DEFAULT_VIEW_MODE } from './types'
 import { validateProfile, normalizeProfile } from './lib/validation'
 import { serializeProfile } from './lib/serializeProfile'
 import { useProfileHistory } from './hooks/useProfileHistory'
@@ -142,6 +142,16 @@ export default function App() {
 
   const setProfileId = useCallback((id: string) => {
     mutateProfile((p) => ({ ...p, id: id.trim() }))
+  }, [mutateProfile])
+
+  const setProfileView = useCallback((view: ViewMode) => {
+    mutateProfile((p) => {
+      if (view === DEFAULT_VIEW_MODE) {
+        const { view: _omitted, ...rest } = p
+        return rest
+      }
+      return { ...p, view }
+    })
   }, [mutateProfile])
 
   const setTabLabelLine = useCallback(
@@ -616,6 +626,8 @@ export default function App() {
       <Header
         profileId={profile.id}
         onProfileIdChange={setProfileId}
+        view={profile.view ?? DEFAULT_VIEW_MODE}
+        onViewChange={setProfileView}
         onNew={newProfile}
         onLoad={handleLoad}
         onSaveAs={handleSaveAs}

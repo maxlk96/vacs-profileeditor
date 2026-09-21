@@ -54,9 +54,28 @@ export interface Tab {
   page: DirectAccessPage;
 }
 
+export const VIEW_MODES = ['page', 'split', 'cycle'] as const;
+
+export type ViewMode = (typeof VIEW_MODES)[number];
+
+/** `"page"` is the default when `view` is omitted. */
+export const DEFAULT_VIEW_MODE: ViewMode = 'page';
+
+export const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  page: 'Page (default)',
+  split: 'Split',
+  cycle: 'Cycle',
+};
+
+export function isViewMode(value: unknown): value is ViewMode {
+  return typeof value === 'string' && (VIEW_MODES as readonly string[]).includes(value);
+}
+
 export interface TabbedProfile {
   id: string;
   type: 'Tabbed';
+  /** How the client arranges radio and phone pages. Omitted means `"page"`. */
+  view?: ViewMode;
   tabs: Tab[];
 }
 
