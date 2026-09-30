@@ -1,8 +1,26 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import type { TabbedProfile, DirectAccessKey, DirectAccessPage, ViewMode } from './types'
-import { createDefaultProfile, DEFAULT_VIEW_MODE } from './types'
+import type {
+  TabbedProfile,
+  DirectAccessKey,
+  DirectAccessPage,
+  ViewMode,
+  GeoProfile,
+} from './types'
+import {
+  createDefaultProfile,
+  createDefaultGeoProfile,
+  DEFAULT_VIEW_MODE,
+  isTabbedProfile,
+  isGeoProfile,
+} from './types'
 import { validateProfile, normalizeProfile } from './lib/validation'
 import { serializeProfile } from './lib/serializeProfile'
+import {
+  expandKeysForMoreRows,
+  remapKeyIndexForRowChange,
+  removedRowsAreBlank,
+  shrinkKeysForFewerRows,
+} from './lib/pageKeys'
 import { useProfileHistory } from './hooks/useProfileHistory'
 import { loadStations } from './lib/vacsStations'
 import { fetchProfileJson, type ProfileRef } from './lib/vacsProfiles'
@@ -10,6 +28,7 @@ import Header from './components/Header'
 import TabBar from './components/TabBar'
 import KeyGrid from './components/KeyGrid'
 import KeyEditor from './components/KeyEditor'
+import GeoProfileEditor from './components/GeoProfileEditor'
 import LoadFromDatasetModal from './components/LoadFromDatasetModal'
 import { IconUndo, IconRedo } from './components/Icons'
 
@@ -40,90 +59,6 @@ function getRowsAtPath(profile: TabbedProfile, tabIndex: number, path: SubpagePa
   return page?.rows ?? 4
 }
 
-/** Blank DA key used when expanding/shrinking the grid. */
-function blankKey(): DirectAccessKey {
-  return { label: [] }
-}
-
-function isBlankKey(key: DirectAccessKey): boolean {
-  const lines = key.label ?? []
-  if (lines.some((line) => (line ?? '').trim() !== '')) return false
-  if (key.station_id != null && key.station_id.trim() !== '') return false
-  if (key.page != null) return false
-  if (key.color != null) return false
-  return true
-}
-
-/** True when every cell in rows [newRows, oldRows) is blank or missing. */
-function removedRowsAreBlank(
-  keys: DirectAccessKey[],
-  oldRows: number,
-  newRows: number
-): boolean {
-  if (keys.length === 0 || oldRows < 1 || newRows >= oldRows) return true
-  const numCols = Math.ceil(keys.length / oldRows)
-  for (let c = 0; c < numCols; c++) {
-    for (let r = newRows; r < oldRows; r++) {
-      const idx = c * oldRows + r
-      if (idx < keys.length && !isBlankKey(keys[idx])) return false
-    }
-  }
-  return true
-}
-
-/**
- * When increasing rows, insert blank cells at the bottom of each column so
- * existing keys keep their visual (column, row) positions under column-major layout.
- */
-function expandKeysForMoreRows(
-  keys: DirectAccessKey[],
-  oldRows: number,
-  newRows: number
-): DirectAccessKey[] {
-  if (newRows <= oldRows || keys.length === 0 || oldRows < 1) return keys
-  const numCols = Math.ceil(keys.length / oldRows)
-  const next: DirectAccessKey[] = Array.from({ length: numCols * newRows }, blankKey)
-  for (let i = 0; i < keys.length; i++) {
-    const col = Math.floor(i / oldRows)
-    const row = i % oldRows
-    next[col * newRows + row] = keys[i]
-  }
-  return next
-}
-
-/**
- * When decreasing rows and the removed rows are blank, drop those blanks so
- * existing keys keep their visual positions under column-major layout.
- * Preserves blank cells in kept rows (including trailing blank columns).
- */
-function shrinkKeysForFewerRows(
-  keys: DirectAccessKey[],
-  oldRows: number,
-  newRows: number
-): DirectAccessKey[] {
-  if (newRows >= oldRows || keys.length === 0 || oldRows < 1) return keys
-  if (!removedRowsAreBlank(keys, oldRows, newRows)) return keys
-  const numCols = Math.ceil(keys.length / oldRows)
-  const next: DirectAccessKey[] = []
-  for (let c = 0; c < numCols; c++) {
-    for (let r = 0; r < newRows; r++) {
-      const oldIdx = c * oldRows + r
-      if (oldIdx >= keys.length) break
-      next.push(keys[oldIdx])
-    }
-  }
-  return next
-}
-
-function remapKeyIndexForRowChange(index: number, oldRows: number, newRows: number): number | null {
-  if (oldRows < 1 || newRows === oldRows) return index
-  const col = Math.floor(index / oldRows)
-  const row = index % oldRows
-  if (newRows > oldRows) return col * newRows + row
-  if (row >= newRows) return null
-  return col * newRows + row
-}
-
 export interface BreadcrumbItem {
   label: string
   path: SubpagePath
@@ -133,7 +68,6 @@ function getBreadcrumbItems(profile: TabbedProfile, tabIndex: number, path: Subp
   const items: BreadcrumbItem[] = []
   const tab = profile.tabs[tabIndex]
   if (!tab) return items
-  // Use first line of label for breadcrumb
   items.push({ label: tab.label[0] || 'Tab', path: [] })
   let page = tab.page
   for (let i = 0; i < path.length; i++) {
@@ -150,12 +84,14 @@ function getBreadcrumbItems(profile: TabbedProfile, tabIndex: number, path: Subp
 }
 
 export default function App() {
-  const { profile, mutateProfile, replaceProfile, undo, redo, canUndo, canRedo } = useProfileHistory(createDefaultProfile())
+  const { profile, mutateProfile, replaceProfile, undo, redo, canUndo, canRedo } = useProfileHistory(createDefaultGeoProfile())
   const [selectedTabIndex, setSelectedTabIndex] = useState(0)
   const [selectedKeyIndices, setSelectedKeyIndices] = useState<number[]>([])
   const [subpagePath, setSubpagePath] = useState<SubpagePath>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showNewProfileConfirm, setShowNewProfileConfirm] = useState(false)
+  const [newProfileType, setNewProfileType] = useState<'Tabbed' | 'Geo'>('Geo')
+  const [pendingTypeSwitch, setPendingTypeSwitch] = useState<'Tabbed' | 'Geo' | null>(null)
   const [showLoadFromDataset, setShowLoadFromDataset] = useState(false)
   const [datasetLoadError, setDatasetLoadError] = useState<string | null>(null)
   const [datasetLoading, setDatasetLoading] = useState(false)
@@ -165,6 +101,23 @@ export default function App() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const stationIdInputRef = useRef<HTMLInputElement>(null)
   const keyClipboardRef = useRef<{ keys: DirectAccessKey[]; cut: boolean } | null>(null)
+
+  const mutateTabbed = useCallback(
+    (updater: (p: TabbedProfile) => TabbedProfile) => {
+      mutateProfile((p) => (isTabbedProfile(p) ? updater(p) : p))
+    },
+    [mutateProfile]
+  )
+
+  const mutateGeo = useCallback(
+    (updater: (p: GeoProfile) => GeoProfile) => {
+      mutateProfile((p) => (isGeoProfile(p) ? updater(p) : p))
+    },
+    [mutateProfile]
+  )
+
+  const tabbedProfile = isTabbedProfile(profile) ? profile : null
+  const geoProfile = isGeoProfile(profile) ? profile : null
 
   const loadStationsFromGitHub = useCallback(() => {
     if (stationIdsLoading) return
@@ -214,19 +167,26 @@ export default function App() {
   }, [undo, redo])
 
   useEffect(() => {
-    if (profile.tabs.length > 0 && selectedTabIndex >= profile.tabs.length) {
-      setSelectedTabIndex(profile.tabs.length - 1)
+    if (tabbedProfile && tabbedProfile.tabs.length > 0 && selectedTabIndex >= tabbedProfile.tabs.length) {
+      setSelectedTabIndex(tabbedProfile.tabs.length - 1)
     }
-  }, [profile.tabs.length, selectedTabIndex])
+  }, [tabbedProfile, selectedTabIndex])
 
   useEffect(() => {
-    const keys = getKeysAtPath(profile, selectedTabIndex, subpagePath)
+    if (!tabbedProfile) return
+    const keys = getKeysAtPath(tabbedProfile, selectedTabIndex, subpagePath)
     setSelectedKeyIndices((prev) => prev.filter((i) => i < keys.length))
-  }, [profile, selectedTabIndex, subpagePath])
+  }, [tabbedProfile, selectedTabIndex, subpagePath])
 
-  const currentPage = getPageAtPath(profile, selectedTabIndex, subpagePath)
-  const currentKeys = getKeysAtPath(profile, selectedTabIndex, subpagePath)
-  const currentRows = getRowsAtPath(profile, selectedTabIndex, subpagePath)
+  const currentPage = tabbedProfile
+    ? getPageAtPath(tabbedProfile, selectedTabIndex, subpagePath)
+    : null
+  const currentKeys = tabbedProfile
+    ? getKeysAtPath(tabbedProfile, selectedTabIndex, subpagePath)
+    : []
+  const currentRows = tabbedProfile
+    ? getRowsAtPath(tabbedProfile, selectedTabIndex, subpagePath)
+    : 4
   const isClientPage = currentPage?.client_page != null
 
   const setProfileId = useCallback((id: string) => {
@@ -234,18 +194,40 @@ export default function App() {
   }, [mutateProfile])
 
   const setProfileView = useCallback((view: ViewMode) => {
-    mutateProfile((p) => {
+    mutateTabbed((p) => {
       if (view === DEFAULT_VIEW_MODE) {
         const { view: _omitted, ...rest } = p
         return rest
       }
       return { ...p, view }
     })
-  }, [mutateProfile])
+  }, [mutateTabbed])
+
+  const requestProfileTypeChange = useCallback(
+    (type: 'Tabbed' | 'Geo') => {
+      if (type === profile.type) return
+      setPendingTypeSwitch(type)
+    },
+    [profile.type]
+  )
+
+  const confirmProfileTypeSwitch = useCallback(() => {
+    if (pendingTypeSwitch == null) return
+    const id = profile.id
+    if (pendingTypeSwitch === 'Geo') {
+      replaceProfile({ ...createDefaultGeoProfile(), id })
+    } else {
+      replaceProfile({ ...createDefaultProfile(), id })
+    }
+    setSelectedTabIndex(0)
+    setSelectedKeyIndices([])
+    setSubpagePath([])
+    setPendingTypeSwitch(null)
+  }, [pendingTypeSwitch, profile.id, replaceProfile])
 
   const setTabLabelLine = useCallback(
     (tabIndex: number, lineIndex: number, value: string) => {
-      mutateProfile((p) => ({
+      mutateTabbed((p) => ({
         ...p,
         tabs: p.tabs.map((t, i) => {
           if (i !== tabIndex) return t
@@ -256,12 +238,12 @@ export default function App() {
         }),
       }))
     },
-    [mutateProfile]
+    [mutateTabbed]
   )
 
   const updateKeyAtPath = useCallback(
     (path: SubpagePath, keyIndex: number, updater: (k: DirectAccessKey) => DirectAccessKey) => {
-      mutateProfile((p) => {
+      mutateTabbed((p) => {
         const tab = p.tabs[selectedTabIndex]
         if (!tab) return p
         const apply = (page: DirectAccessPage, pathIdx: number): DirectAccessPage => {
@@ -288,12 +270,12 @@ export default function App() {
         }
       })
     },
-    [selectedTabIndex, mutateProfile]
+    [selectedTabIndex, mutateTabbed]
   )
 
   const mutatePageAtPath = useCallback(
     (path: SubpagePath, mutate: (page: DirectAccessPage) => DirectAccessPage) => {
-      mutateProfile((p) => {
+      mutateTabbed((p) => {
         const tab = p.tabs[selectedTabIndex]
         if (!tab) return p
         const apply = (page: DirectAccessPage, pathIdx: number): DirectAccessPage => {
@@ -314,7 +296,7 @@ export default function App() {
         }
       })
     },
-    [selectedTabIndex, mutateProfile]
+    [selectedTabIndex, mutateTabbed]
   )
 
   /** Set rows on the current page (at subpagePath). Use this for the Rows input so it affects the visible grid. */
@@ -353,20 +335,22 @@ export default function App() {
   )
 
   const addTab = useCallback(() => {
-    mutateProfile((p) => ({
+    if (!tabbedProfile) return
+    mutateTabbed((p) => ({
       ...p,
       tabs: [...p.tabs, { label: [`Tab ${p.tabs.length + 1}`], page: { rows: 4, keys: [] } }],
     }))
-    setSelectedTabIndex(profile.tabs.length)
+    setSelectedTabIndex(tabbedProfile.tabs.length)
     setSelectedKeyIndices([])
     setSubpagePath([])
-  }, [mutateProfile, profile.tabs.length])
+  }, [mutateTabbed, tabbedProfile])
 
   const duplicateTab = useCallback(() => {
-    const tab = profile.tabs[selectedTabIndex]
+    if (!tabbedProfile) return
+    const tab = tabbedProfile.tabs[selectedTabIndex]
     if (!tab) return
     const dup = JSON.parse(JSON.stringify(tab)) as typeof tab
-    mutateProfile((p) => {
+    mutateTabbed((p) => {
       const tabs = [...p.tabs]
       tabs.splice(selectedTabIndex + 1, 0, dup)
       return { ...p, tabs }
@@ -374,26 +358,26 @@ export default function App() {
     setSelectedTabIndex(selectedTabIndex + 1)
     setSelectedKeyIndices([])
     setSubpagePath([])
-  }, [mutateProfile, profile.tabs, selectedTabIndex])
+  }, [mutateTabbed, tabbedProfile, selectedTabIndex])
 
   const removeTab = useCallback(() => {
-    if (profile.tabs.length <= 1) return
-    mutateProfile((p) => ({ ...p, tabs: p.tabs.filter((_, i) => i !== selectedTabIndex) }))
+    if (!tabbedProfile || tabbedProfile.tabs.length <= 1) return
+    mutateTabbed((p) => ({ ...p, tabs: p.tabs.filter((_, i) => i !== selectedTabIndex) }))
     setSelectedTabIndex(Math.max(0, selectedTabIndex - 1))
     setSelectedKeyIndices([])
     setSubpagePath([])
-  }, [mutateProfile, profile.tabs.length, selectedTabIndex])
+  }, [mutateTabbed, tabbedProfile, selectedTabIndex])
 
   const moveTab = useCallback((from: number, to: number) => {
-    if (to < 0 || to >= profile.tabs.length) return
-    mutateProfile((p) => {
+    if (!tabbedProfile || to < 0 || to >= tabbedProfile.tabs.length) return
+    mutateTabbed((p) => {
       const tabs = [...p.tabs]
       const [removed] = tabs.splice(from, 1)
       tabs.splice(to, 0, removed)
       return { ...p, tabs }
     })
     setSelectedTabIndex(to)
-  }, [mutateProfile, profile.tabs.length])
+  }, [mutateTabbed, tabbedProfile])
 
   const reorderTabs = useCallback((from: number, to: number) => {
     moveTab(from, to)
@@ -656,17 +640,18 @@ export default function App() {
   }, [downloadProfile, profile.id])
 
   const applyNewProfile = useCallback(() => {
-    replaceProfile(createDefaultProfile())
+    replaceProfile(newProfileType === 'Geo' ? createDefaultGeoProfile() : createDefaultProfile())
     setSelectedTabIndex(0)
     setSelectedKeyIndices([])
     setSubpagePath([])
     setLoadError(null)
     setShowNewProfileConfirm(false)
-  }, [])
+  }, [newProfileType, replaceProfile])
 
   const newProfile = useCallback(() => {
+    setNewProfileType(profile.type)
     setShowNewProfileConfirm(true)
-  }, [])
+  }, [profile.type])
 
   const handleNewProfileSaveAndNew = useCallback(async () => {
     setShowNewProfileConfirm(false)
@@ -690,6 +675,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!tabbedProfile) return
     const handler = (e: KeyboardEvent) => {
       const target = e.target as Node
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
@@ -740,7 +726,7 @@ export default function App() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [selectedKeyIndices, currentKeys, currentRows, isClientPage, moveKey, moveSelectedKeys, goToSubpage, removeKey, clearKeys, copyKeys, cutKeys, pasteKeys])
+  }, [tabbedProfile, selectedKeyIndices, currentKeys, currentRows, isClientPage, moveKey, moveSelectedKeys, goToSubpage, removeKey, clearKeys, copyKeys, cutKeys, pasteKeys])
 
   const handleSelectKey = useCallback((index: number, addToSelection: boolean, rangeSelect: boolean) => {
     if (rangeSelect && selectedKeyIndices.length > 0) {
@@ -779,7 +765,9 @@ export default function App() {
       <Header
         profileId={profile.id}
         onProfileIdChange={setProfileId}
-        view={profile.view ?? DEFAULT_VIEW_MODE}
+        profileType={profile.type}
+        onProfileTypeChange={requestProfileTypeChange}
+        view={tabbedProfile?.view ?? DEFAULT_VIEW_MODE}
         onViewChange={setProfileView}
         onNew={newProfile}
         onLoad={handleLoad}
@@ -810,6 +798,16 @@ export default function App() {
           <div className="modal">
             <h2 id="new-profile-dialog-title">Create new profile?</h2>
             <p>Save the current profile first or discard changes?</p>
+            <label>
+              New profile type
+              <select
+                value={newProfileType}
+                onChange={(e) => setNewProfileType(e.target.value as 'Tabbed' | 'Geo')}
+              >
+                <option value="Geo">Geo</option>
+                <option value="Tabbed">Tabbed</option>
+              </select>
+            </label>
             <div className="modal-actions">
               <button type="button" onClick={handleNewProfileSaveAndNew}>
                 Save & new
@@ -824,6 +822,39 @@ export default function App() {
           </div>
         </div>
       )}
+      {pendingTypeSwitch != null && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="type-switch-title">
+          <div className="modal">
+            <h2 id="type-switch-title">Switch to {pendingTypeSwitch} profile?</h2>
+            <p>
+              Changing type replaces the current layout with a blank {pendingTypeSwitch} profile
+              (profile ID is kept). This cannot be undone as a conversion.
+            </p>
+            <div className="modal-actions">
+              <button type="button" onClick={confirmProfileTypeSwitch}>
+                Switch
+              </button>
+              <button type="button" onClick={() => setPendingTypeSwitch(null)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {geoProfile != null ? (
+        <GeoProfileEditor
+          profile={geoProfile}
+          mutateProfile={mutateGeo}
+          undo={undo}
+          redo={redo}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          stations={stations}
+          stationIdsLoadError={stationIdsLoadError}
+          stationIdsLoading={stationIdsLoading}
+          onLoadStations={loadStationsFromGitHub}
+        />
+      ) : tabbedProfile != null ? (
       <main className="main-content">
         <section className="tab-editor">
           <h3>Tab</h3>
@@ -831,7 +862,7 @@ export default function App() {
             Label line 1
             <input
               type="text"
-              value={profile.tabs[selectedTabIndex]?.label[0] ?? ''}
+              value={tabbedProfile.tabs[selectedTabIndex]?.label[0] ?? ''}
               onChange={(e) => setTabLabelLine(selectedTabIndex, 0, e.target.value)}
               placeholder="First line"
             />
@@ -840,7 +871,7 @@ export default function App() {
             Label line 2
             <input
               type="text"
-              value={profile.tabs[selectedTabIndex]?.label[1] ?? ''}
+              value={tabbedProfile.tabs[selectedTabIndex]?.label[1] ?? ''}
               onChange={(e) => setTabLabelLine(selectedTabIndex, 1, e.target.value)}
               placeholder="Second line (optional)"
             />
@@ -849,7 +880,7 @@ export default function App() {
             Label line 3
             <input
               type="text"
-              value={profile.tabs[selectedTabIndex]?.label[2] ?? ''}
+              value={tabbedProfile.tabs[selectedTabIndex]?.label[2] ?? ''}
               onChange={(e) => setTabLabelLine(selectedTabIndex, 2, e.target.value)}
               placeholder="Third line (optional)"
             />
@@ -879,13 +910,13 @@ export default function App() {
             onCopyKeys={copyKeys}
             onCutKeys={cutKeys}
             onPasteKeys={pasteKeys}
-            breadcrumbItems={getBreadcrumbItems(profile, selectedTabIndex, subpagePath)}
+            breadcrumbItems={getBreadcrumbItems(tabbedProfile, selectedTabIndex, subpagePath)}
             onBackToPath={goBackToPath}
             isClientPage={isClientPage}
             stations={stations}
             tabBarSlot={
               <TabBar
-                tabs={profile.tabs}
+                tabs={tabbedProfile.tabs}
                 selectedIndex={selectedTabIndex}
                 onSelectTab={setSelectedTabIndex}
                 onReorderTabs={reorderTabs}
@@ -936,6 +967,7 @@ export default function App() {
           </div>
         </aside>
       </main>
+      ) : null}
     </div>
   )
 }

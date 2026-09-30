@@ -125,3 +125,25 @@ export function IconSwap() {
   )
 }
 
+/** Tabbed profile: tab strip + key grid */
+export function IconProfileTabbed() {
+  return (
+    <svg {...iconProps} viewBox="0 0 16 16" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M2 4h4v2H2zM7 4h3v2H7z" />
+      <rect x="2" y="7" width="12" height="7" rx="1" />
+      <path d="M6 7v7M10 7v7M2 10.5h12" />
+    </svg>
+  )
+}
+
+/** Geo profile: nested flex containers */
+export function IconProfileGeo() {
+  return (
+    <svg {...iconProps} viewBox="0 0 16 16" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="2" width="5" height="12" rx="1" />
+      <rect x="9" y="2" width="5" height="5" rx="1" />
+      <rect x="9" y="9" width="5" height="5" rx="1" />
+    </svg>
+  )
+}
+

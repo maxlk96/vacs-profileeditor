@@ -1,15 +1,15 @@
 import { useState, useCallback } from 'react'
-import type { TabbedProfile } from '../types'
+import type { Profile } from '../types'
 
-export function useProfileHistory(initial: TabbedProfile) {
-  const [historyState, setHistoryState] = useState<{ history: TabbedProfile[]; index: number }>({
+export function useProfileHistory(initial: Profile) {
+  const [historyState, setHistoryState] = useState<{ history: Profile[]; index: number }>({
     history: [initial],
     index: 0,
   })
 
   const profile = historyState.history[historyState.index]
 
-  const mutateProfile = useCallback((updater: (p: TabbedProfile) => TabbedProfile) => {
+  const mutateProfile = useCallback((updater: (p: Profile) => Profile) => {
     setHistoryState((prev) => {
       const current = prev.history[prev.index]
       const next = updater(current)
@@ -18,7 +18,7 @@ export function useProfileHistory(initial: TabbedProfile) {
     })
   }, [])
 
-  const replaceProfile = useCallback((p: TabbedProfile) => {
+  const replaceProfile = useCallback((p: Profile) => {
     setHistoryState({ history: [p], index: 0 })
   }, [])
 

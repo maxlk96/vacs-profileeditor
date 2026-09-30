@@ -8,6 +8,8 @@ import {
 interface HeaderProps {
   profileId: string
   onProfileIdChange: (id: string) => void
+  profileType: 'Tabbed' | 'Geo'
+  onProfileTypeChange: (type: 'Tabbed' | 'Geo') => void
   view: ViewMode
   onViewChange: (view: ViewMode) => void
   onNew: () => void
@@ -21,9 +23,14 @@ interface HeaderProps {
 const VIEW_MODE_HELP =
   'Page: Radio and Phone as full-size pages. Split: Phone tab, plus a Radio tab with the phone page beside it. Cycle: a Page button cycles radio, phone, and mixed views. Split and Cycle open mixed view (four key columns by default).'
 
+const TYPE_HELP =
+  'Tabbed: tabs with a key grid. Geo: flexible containers, buttons, and dividers.'
+
 export default function Header({
   profileId,
   onProfileIdChange,
+  profileType,
+  onProfileTypeChange,
   view,
   onViewChange,
   onNew,
@@ -33,7 +40,7 @@ export default function Header({
   fileInputRef,
   onFileChange,
 }: HeaderProps) {
-  const showMixedViewHint = view === 'split' || view === 'cycle'
+  const showMixedViewHint = profileType === 'Tabbed' && (view === 'split' || view === 'cycle')
 
   return (
     <header className="app-header">
@@ -46,20 +53,32 @@ export default function Header({
           placeholder="e.g. LOWW"
         />
       </label>
-      <label title={VIEW_MODE_HELP}>
-        View
+      <label title={TYPE_HELP}>
+        Type
         <select
-          value={view}
-          onChange={(e) => onViewChange(e.target.value as ViewMode)}
-          aria-describedby={showMixedViewHint ? 'view-mode-hint' : undefined}
+          value={profileType}
+          onChange={(e) => onProfileTypeChange(e.target.value as 'Tabbed' | 'Geo')}
         >
-          {VIEW_MODES.map((mode) => (
-            <option key={mode} value={mode}>
-              {VIEW_MODE_LABELS[mode]}
-            </option>
-          ))}
+          <option value="Geo">Geo</option>
+          <option value="Tabbed">Tabbed</option>
         </select>
       </label>
+      {profileType === 'Tabbed' && (
+        <label title={VIEW_MODE_HELP}>
+          View
+          <select
+            value={view}
+            onChange={(e) => onViewChange(e.target.value as ViewMode)}
+            aria-describedby={showMixedViewHint ? 'view-mode-hint' : undefined}
+          >
+            {VIEW_MODES.map((mode) => (
+              <option key={mode} value={mode}>
+                {VIEW_MODE_LABELS[mode]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <button type="button" onClick={onNew}>
         New profile
       </button>
@@ -83,6 +102,11 @@ export default function Header({
       {showMixedViewHint && (
         <p id="view-mode-hint" className="view-mode-hint">
           Mixed view defaults to four key columns; extra columns scroll horizontally.
+        </p>
+      )}
+      {profileType === 'Geo' && (
+        <p className="view-mode-hint">
+          Geo layout: select nodes in the tree or preview. Double-click a button with a page to edit its keys.
         </p>
       )}
     </header>

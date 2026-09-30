@@ -1,9 +1,11 @@
 /**
- * Discover and load tabbed profiles from vacs-project/vacs-data.
+ * Discover and load profiles from vacs-project/vacs-data.
  * Profiles live at dataset/{FIR}/profiles/*.json.
  */
 
 import { fetchRepoTree, rawDatasetUrl } from './vacsGithub'
+
+export type DatasetProfileType = 'Tabbed' | 'Geo'
 
 export interface ProfileRef {
   fir: string
@@ -14,9 +16,16 @@ export interface ProfileRef {
 }
 
 const PROFILE_PATH_RE = /^dataset\/([^/]+)\/profiles\/([^/]+\.json)$/
+const PROFILE_TYPE_RE = /"type"\s*:\s*"(Tabbed|Geo)"/
 
 let listInflight: Promise<ProfileRef[]> | null = null
 let listCached: ProfileRef[] | null = null
+const typeCache = new Map<string, DatasetProfileType | null>()
+const typeInflight = new Map<string, Promise<DatasetProfileType | null>>()
+
+function typeCacheKey(ref: ProfileRef): string {
+  return `${ref.fir}/${ref.fileName}`
+}
 
 /**
  * List all profile JSON files in the dataset, sorted by FIR then name.
@@ -61,6 +70,51 @@ export function firsFromProfiles(profiles: ProfileRef[]): string[] {
 /** Profiles in a given FIR folder. */
 export function profilesForFir(profiles: ProfileRef[], fir: string): ProfileRef[] {
   return profiles.filter((p) => p.fir === fir)
+}
+
+/**
+ * Read the profile `type` field from the dataset file (cached).
+ * Uses a light text scan so large Geo profiles are not fully parsed.
+ */
+export function fetchProfileType(ref: ProfileRef): Promise<DatasetProfileType | null> {
+  const key = typeCacheKey(ref)
+  if (typeCache.has(key)) return Promise.resolve(typeCache.get(key) ?? null)
+  const existing = typeInflight.get(key)
+  if (existing) return existing
+
+  const p = (async (): Promise<DatasetProfileType | null> => {
+    try {
+      const url = rawDatasetUrl(ref.fir, 'profiles', ref.fileName)
+      const res = await fetch(url)
+      if (!res.ok) {
+        typeCache.set(key, null)
+        return null
+      }
+      const text = await res.text()
+      const m = PROFILE_TYPE_RE.exec(text)
+      const type = m?.[1] === 'Tabbed' || m?.[1] === 'Geo' ? m[1] : null
+      typeCache.set(key, type)
+      return type
+    } catch {
+      typeCache.set(key, null)
+      return null
+    } finally {
+      typeInflight.delete(key)
+    }
+  })()
+
+  typeInflight.set(key, p)
+  return p
+}
+
+/** Resolve types for many refs; returns a map keyed by `fir/fileName`. */
+export async function fetchProfileTypes(
+  refs: ProfileRef[]
+): Promise<Map<string, DatasetProfileType | null>> {
+  const entries = await Promise.all(
+    refs.map(async (ref) => [typeCacheKey(ref), await fetchProfileType(ref)] as const)
+  )
+  return new Map(entries)
 }
 
 /**
