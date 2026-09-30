@@ -38,6 +38,90 @@ function getRowsAtPath(profile: TabbedProfile, tabIndex: number, path: SubpagePa
   return page?.rows ?? 4
 }
 
+/** Blank DA key used when expanding/shrinking the grid. */
+function blankKey(): DirectAccessKey {
+  return { label: [] }
+}
+
+function isBlankKey(key: DirectAccessKey): boolean {
+  const lines = key.label ?? []
+  if (lines.some((line) => (line ?? '').trim() !== '')) return false
+  if (key.station_id != null && key.station_id.trim() !== '') return false
+  if (key.page != null) return false
+  if (key.color != null) return false
+  return true
+}
+
+/** True when every cell in rows [newRows, oldRows) is blank or missing. */
+function removedRowsAreBlank(
+  keys: DirectAccessKey[],
+  oldRows: number,
+  newRows: number
+): boolean {
+  if (keys.length === 0 || oldRows < 1 || newRows >= oldRows) return true
+  const numCols = Math.ceil(keys.length / oldRows)
+  for (let c = 0; c < numCols; c++) {
+    for (let r = newRows; r < oldRows; r++) {
+      const idx = c * oldRows + r
+      if (idx < keys.length && !isBlankKey(keys[idx])) return false
+    }
+  }
+  return true
+}
+
+/**
+ * When increasing rows, insert blank cells at the bottom of each column so
+ * existing keys keep their visual (column, row) positions under column-major layout.
+ */
+function expandKeysForMoreRows(
+  keys: DirectAccessKey[],
+  oldRows: number,
+  newRows: number
+): DirectAccessKey[] {
+  if (newRows <= oldRows || keys.length === 0 || oldRows < 1) return keys
+  const numCols = Math.ceil(keys.length / oldRows)
+  const next: DirectAccessKey[] = Array.from({ length: numCols * newRows }, blankKey)
+  for (let i = 0; i < keys.length; i++) {
+    const col = Math.floor(i / oldRows)
+    const row = i % oldRows
+    next[col * newRows + row] = keys[i]
+  }
+  return next
+}
+
+/**
+ * When decreasing rows and the removed rows are blank, drop those blanks so
+ * existing keys keep their visual positions under column-major layout.
+ * Preserves blank cells in kept rows (including trailing blank columns).
+ */
+function shrinkKeysForFewerRows(
+  keys: DirectAccessKey[],
+  oldRows: number,
+  newRows: number
+): DirectAccessKey[] {
+  if (newRows >= oldRows || keys.length === 0 || oldRows < 1) return keys
+  if (!removedRowsAreBlank(keys, oldRows, newRows)) return keys
+  const numCols = Math.ceil(keys.length / oldRows)
+  const next: DirectAccessKey[] = []
+  for (let c = 0; c < numCols; c++) {
+    for (let r = 0; r < newRows; r++) {
+      const oldIdx = c * oldRows + r
+      if (oldIdx >= keys.length) break
+      next.push(keys[oldIdx])
+    }
+  }
+  return next
+}
+
+function remapKeyIndexForRowChange(index: number, oldRows: number, newRows: number): number | null {
+  if (oldRows < 1 || newRows === oldRows) return index
+  const col = Math.floor(index / oldRows)
+  const row = index % oldRows
+  if (newRows > oldRows) return col * newRows + row
+  if (row >= newRows) return null
+  return col * newRows + row
+}
+
 export interface BreadcrumbItem {
   label: string
   path: SubpagePath
@@ -232,9 +316,35 @@ export default function App() {
   const setCurrentPageRows = useCallback(
     (rows: number) => {
       const n = Math.max(1, Math.floor(rows))
-      mutatePageAtPath(subpagePath, (page) => ({ ...page, rows: n }))
+      const oldRows = currentRows
+      mutatePageAtPath(subpagePath, (page) => {
+        const fromRows = Math.max(1, page.rows ?? 4)
+        if (page.client_page != null || n === fromRows) {
+          return { ...page, rows: n }
+        }
+        const keys = page.keys ?? []
+        if (n > fromRows) {
+          return { ...page, rows: n, keys: expandKeysForMoreRows(keys, fromRows, n) }
+        }
+        if (removedRowsAreBlank(keys, fromRows, n)) {
+          return { ...page, rows: n, keys: shrinkKeysForFewerRows(keys, fromRows, n) }
+        }
+        return { ...page, rows: n }
+      })
+      if (n !== oldRows) {
+        const keys = currentKeys
+        const shouldRemap =
+          n > oldRows || removedRowsAreBlank(keys, oldRows, n)
+        if (shouldRemap) {
+          setSelectedKeyIndices((prev) =>
+            prev
+              .map((i) => remapKeyIndexForRowChange(i, oldRows, n))
+              .filter((i): i is number => i != null)
+          )
+        }
+      }
     },
-    [mutatePageAtPath, subpagePath]
+    [mutatePageAtPath, subpagePath, currentRows, currentKeys]
   )
 
   const addTab = useCallback(() => {
