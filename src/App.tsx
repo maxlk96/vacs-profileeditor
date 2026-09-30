@@ -5,10 +5,12 @@ import { validateProfile, normalizeProfile } from './lib/validation'
 import { serializeProfile } from './lib/serializeProfile'
 import { useProfileHistory } from './hooks/useProfileHistory'
 import { loadStations } from './lib/vacsStations'
+import { fetchProfileJson, type ProfileRef } from './lib/vacsProfiles'
 import Header from './components/Header'
 import TabBar from './components/TabBar'
 import KeyGrid from './components/KeyGrid'
 import KeyEditor from './components/KeyEditor'
+import LoadFromDatasetModal from './components/LoadFromDatasetModal'
 import { IconUndo, IconRedo } from './components/Icons'
 
 /** Path into nested pages: [keyIndex, keyIndex, ...] to reach the current page. Empty = top-level tab page. */
@@ -154,6 +156,9 @@ export default function App() {
   const [subpagePath, setSubpagePath] = useState<SubpagePath>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [showNewProfileConfirm, setShowNewProfileConfirm] = useState(false)
+  const [showLoadFromDataset, setShowLoadFromDataset] = useState(false)
+  const [datasetLoadError, setDatasetLoadError] = useState<string | null>(null)
+  const [datasetLoading, setDatasetLoading] = useState(false)
   const [stations, setStations] = useState<{ id: string; fir: string }[] | null>(null)
   const [stationIdsLoadError, setStationIdsLoadError] = useState<string | null>(null)
   const [stationIdsLoading, setStationIdsLoading] = useState(false)
@@ -563,35 +568,73 @@ export default function App() {
     [moveKey]
   )
 
+  const applyLoadedProfile = useCallback(
+    (data: unknown) => {
+      const result = validateProfile(data)
+      if (result.ok) {
+        replaceProfile(normalizeProfile(result.profile))
+        setSelectedTabIndex(0)
+        setSelectedKeyIndices([])
+        setSubpagePath([])
+        setLoadError(null)
+        return true
+      }
+      setLoadError(result.errors.map((err) => `${err.path}: ${err.message}`).join('; '))
+      return false
+    },
+    [replaceProfile]
+  )
+
   const handleLoad = useCallback(() => {
     fileInputRef.current?.click()
   }, [])
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    setLoadError(null)
-    const reader = new FileReader()
-    reader.onload = () => {
+  const handleLoadFromDataset = useCallback(() => {
+    setDatasetLoadError(null)
+    setShowLoadFromDataset(true)
+  }, [])
+
+  const handleDatasetProfileLoad = useCallback(
+    async (ref: ProfileRef) => {
+      if (datasetLoading) return
+      setDatasetLoadError(null)
+      setDatasetLoading(true)
       try {
-        const text = reader.result as string
-        const data = JSON.parse(text) as unknown
-        const result = validateProfile(data)
-        if (result.ok) {
-          replaceProfile(normalizeProfile(result.profile))
-          setSelectedTabIndex(0)
-          setSelectedKeyIndices([])
-          setSubpagePath([])
+        const data = await fetchProfileJson(ref)
+        if (applyLoadedProfile(data)) {
+          setShowLoadFromDataset(false)
         } else {
-          setLoadError(result.errors.map((err) => `${err.path}: ${err.message}`).join('; '))
+          setDatasetLoadError('Profile failed validation (see error above).')
         }
       } catch (err) {
-        setLoadError(err instanceof Error ? err.message : 'Invalid JSON')
+        setDatasetLoadError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setDatasetLoading(false)
       }
-    }
-    reader.readAsText(file)
-  }, [])
+    },
+    [applyLoadedProfile, datasetLoading]
+  )
+
+  const handleFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+      if (!file) return
+      setLoadError(null)
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const text = reader.result as string
+          const data = JSON.parse(text) as unknown
+          applyLoadedProfile(data)
+        } catch (err) {
+          setLoadError(err instanceof Error ? err.message : 'Invalid JSON')
+        }
+      }
+      reader.readAsText(file)
+    },
+    [applyLoadedProfile]
+  )
 
   const downloadProfile = useCallback(
     async (filename: string) => {
@@ -740,6 +783,7 @@ export default function App() {
         onViewChange={setProfileView}
         onNew={newProfile}
         onLoad={handleLoad}
+        onLoadFromDataset={handleLoadFromDataset}
         onSaveAs={handleSaveAs}
         fileInputRef={fileInputRef}
         onFileChange={handleFileChange}
@@ -748,6 +792,18 @@ export default function App() {
         <div className="load-error" role="alert">
           {loadError}
         </div>
+      )}
+      {showLoadFromDataset && (
+        <LoadFromDatasetModal
+          onLoad={handleDatasetProfileLoad}
+          onCancel={() => {
+            if (datasetLoading) return
+            setShowLoadFromDataset(false)
+            setDatasetLoadError(null)
+          }}
+          loading={datasetLoading}
+          error={datasetLoadError}
+        />
       )}
       {showNewProfileConfirm && (
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="new-profile-dialog-title">

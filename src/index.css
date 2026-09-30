@@ -606,6 +606,12 @@ input::placeholder, textarea::placeholder {
   border-radius: 8px;
   padding: 1.5rem;
   max-width: 360px;
+  width: min(100% - 2rem, 360px);
+}
+
+.modal-load-dataset {
+  max-width: 420px;
+  width: min(100% - 2rem, 420px);
 }
 
 .modal h2 {
@@ -626,8 +632,19 @@ input::placeholder, textarea::placeholder {
   margin-bottom: 1rem;
 }
 
-.modal label input {
+.modal label input,
+.modal label select {
   width: 100%;
+}
+
+.modal-status {
+  margin: 0 0 1rem 0;
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+
+.modal-status-error {
+  color: #fca5a5;
 }
 
 .modal-actions {

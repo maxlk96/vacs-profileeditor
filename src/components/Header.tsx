@@ -12,6 +12,7 @@ interface HeaderProps {
   onViewChange: (view: ViewMode) => void
   onNew: () => void
   onLoad: () => void
+  onLoadFromDataset: () => void
   onSaveAs: () => void
   fileInputRef: RefObject<HTMLInputElement | null>
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
@@ -27,6 +28,7 @@ export default function Header({
   onViewChange,
   onNew,
   onLoad,
+  onLoadFromDataset,
   onSaveAs,
   fileInputRef,
   onFileChange,
@@ -63,6 +65,9 @@ export default function Header({
       </button>
       <button type="button" onClick={onLoad}>
         Load JSON
+      </button>
+      <button type="button" onClick={onLoadFromDataset}>
+        Load from dataset
       </button>
       <input
         ref={fileInputRef}

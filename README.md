@@ -5,7 +5,7 @@
 A simple GUI to create and edit **VACS tabbed profiles** without manually editing JSON.  
 Profiles define the layout of direct-access keys for the [VATSIM ATC Communication System (vacs)](https://github.com/MorpheusXAUT/vacs) client.
 
-- **JSON import/export**: Load a profile from a `.json` file, edit in the UI, save as JSON (download).
+- **JSON import/export**: Load a profile from a `.json` file or straight from the [vacs-data](https://github.com/vacs-project/vacs-data) dataset (filter by FIR folder), edit in the UI, save as JSON (download).
 - **View mode**: Set how the client arranges radio and phone pages (`page`, `split`, or `cycle`). Omitted in JSON when left at the default (`page`).
 - **Tabs**: Add, duplicate, remove, reorder tabs (including **drag-and-drop**). Edit tab label and row count.
 - **Keys**: Add, remove, reorder keys (including **drag-and-drop** in the grid). **Multi-select** with Ctrl+click (or Shift+click for range) to move several at once. **Copy/cut/paste** keys (Ctrl+C/X/V). Move key left/right/up/down. Edit label (up to 3 lines), button color, station ID, and optional subpage.
@@ -43,7 +43,7 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173. Use **Load JSON** to open a profile (e.g. from [vacs-data](https://github.com/vacs-project/vacs-data/tree/main/dataset/LO/profiles)), edit, and **Save JSON** to download.
+Then open http://localhost:5173. Use **Load JSON** for a local file, or **Load from dataset** to pick an FIR and profile from [vacs-data](https://github.com/vacs-project/vacs-data/tree/main/dataset). Edit, then **Save as** to download.
 
 ## Build
 

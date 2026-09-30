@@ -7,17 +7,7 @@
  * then fetches raw content from raw.githubusercontent.com (not rate-limited).
  */
 
-const TREE_API = 'https://api.github.com/repos/vacs-project/vacs-data/git/trees/main?recursive=1'
-const RAW_BASE = 'https://raw.githubusercontent.com/vacs-project/vacs-data/main/dataset'
-
-/** Optional token for higher GitHub API rate limits (5k/hr vs 60/hr). Set VITE_GITHUB_TOKEN in .env.local */
-const GITHUB_TOKEN = import.meta.env.VITE_GITHUB_TOKEN as string | undefined
-
-function apiHeaders(): HeadersInit {
-  const h: HeadersInit = { Accept: 'application/vnd.github.v3+json' }
-  if (GITHUB_TOKEN) (h as Record<string, string>)['Authorization'] = `Bearer ${GITHUB_TOKEN}`
-  return h
-}
+import { fetchRepoTree, rawDatasetUrl } from './vacsGithub'
 
 export interface StationEntry {
   id: string
@@ -34,20 +24,12 @@ interface StationFileRef {
 }
 
 /**
- * Discover all station files in a single API call using the Git Trees API (recursive).
+ * Discover all station files using the shared recursive git tree.
  * Returns a list of { fir, fileName } for each dataset/{fir}/stations.toml or stations.json found.
  * When both toml and json exist for the same FIR, toml is preferred.
  */
 async function discoverStationFiles(): Promise<StationFileRef[]> {
-  let res = await fetch(TREE_API, { headers: apiHeaders() })
-  // If a configured token is invalid/expired, GitHub returns 401.
-  // Retry once without Authorization so the app can still use anonymous limits.
-  if (res.status === 401 && GITHUB_TOKEN) {
-    res = await fetch(TREE_API, { headers: { Accept: 'application/vnd.github.v3+json' } })
-  }
-  if (!res.ok) throw new Error(`Failed to fetch repo tree: ${res.status} ${res.statusText}`)
-  const data = await res.json()
-  const tree: { path: string; type: string }[] = data.tree ?? []
+  const tree = await fetchRepoTree()
 
   // Match paths like "dataset/{FIR}/stations.toml" or "dataset/{FIR}/stations.json"
   const stationFileRe = /^dataset\/([^/]+)\/(stations\.(?:toml|json))$/
@@ -113,7 +95,7 @@ function parseJsonStations(data: unknown): { id: string; parent_id?: string; con
 
 /** Fetch and parse stations for one FIR given the already-known file name (no API call). */
 async function fetchStationsForFir(ref: StationFileRef): Promise<StationEntry[]> {
-  const url = `${RAW_BASE}/${encodeURIComponent(ref.fir)}/${ref.fileName}`
+  const url = rawDatasetUrl(ref.fir, ref.fileName)
   const res = await fetch(url)
   if (!res.ok) return []
 
